@@ -1,6 +1,0 @@
-multi_digit.c       DONE
-newlines.c          DONE
-no_newlines.c       DONE
-return_0.c          DONE
-return_2.c          DONE
-spaces.c            DONE

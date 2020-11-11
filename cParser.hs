@@ -105,10 +105,14 @@ notNull (Parser p) =
        then Nothing
     else Just (input', xs)
 
--- NOTE: discard white space 
+-- NOTE: discard whitespace 
 -- Returns True for any Unicode space character, and the control characters \t, \n, \r, \f, \v.
 ws :: Parser String
 ws = spanP isSpace
+
+-- NOTE: Mandatory whitespace
+mandWs :: Parser String
+mandWs = spanP (not . isSpace)
 
 -- NOTE: many applies a function on its input until it fails:
 -- Running runParser jsonNull "nullnullnull" would produce Just("nullnull", JsonNull), adding many:
@@ -127,13 +131,23 @@ stringLiteral = singleQuotes <|> doubleQuotes
 semiColon :: Parser Semicolon
 semiColon = (\_ -> Semicolon) <$> stringP ";"
 
+int_max = 2147483647
+
+isIntMax :: Parser String -> Parser String
+isIntMax (Parser p) = 
+  Parser $ \input -> do
+    (input', xs) <- p input
+    if read xs > int_max 
+       then Nothing
+    else Just (input', xs)
+
 -- NOTE: Only parses an int for now
 expression :: Parser Expression
-expression = f <$> notNull (ws *> spanP isDigit <* ws)
-  where f ds = Expression $ read ds
+expression = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
+  where f ds  = Expression $ read ds
 
 returnStatement :: Parser Statement
-returnStatement = (\_ -> Return) <$> stringP "return"
+returnStatement = (\_ -> Return) <$> stringP "return" <* mandWs
 
 -- NOTE: Can be a lot of things
 statement :: Parser Statement
