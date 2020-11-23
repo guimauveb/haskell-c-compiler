@@ -41,7 +41,7 @@ Right (Program (Function (ReturnType "int") (Identifier "main") (Params []) (Bod
 ```
 
 - A program containing a **simple function** (with or without parameters) and a **return statement**.
-The following funtion:
+The following function:
 ```
 int func(int i, int j)
 {
