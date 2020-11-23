@@ -21,8 +21,16 @@ import Prelude
 import Data.Char
 import Control.Applicative
 
+data Input = Input 
+  { location :: Int
+  , inputStr :: String
+  } deriving (Show, Eq)
+
+data Declaration = Declaration VariableType Identifier 
+  deriving (Show)
+
 -- Function parameters
-data Params = Params [String]
+data Params = Params [Declaration]
   deriving (Show)
 
 -- We only care about return statements for now 
@@ -41,6 +49,9 @@ data Body = Body [Statement]
 data Identifier = Identifier String
   deriving (Show)
 
+data VariableType = VariableType String
+  deriving (Show)
+
 data ReturnType = ReturnType String
   deriving (Show)
 
@@ -54,7 +65,7 @@ data ParserError = ParserError Int String
   deriving (Show) 
 
 instance Alternative (Either ParserError) where
-    empty        = Left $ ParserError 0 "empty"
+    empty        = Left $ ParserError 1 "Empty."
     Left _ <|> n = n
     m      <|> _ = m
 
@@ -92,7 +103,9 @@ charP x = Parser f
     f (y:ys)
       -- Condition guards
         | y == x    = Right (ys, x)
-        | otherwise = Left $ ParserError 0 $"Could not match '" ++ [x] ++ "' in '" ++ str ++ "'."
+        | otherwise = Left $ 
+                      ParserError 
+                      0 $ "Expected '" ++ [x] ++ "', but found '" ++ [y] ++ "'"
         where str = y:ys
     f [] = Left $ ParserError 0 "Empty string."
 
@@ -100,7 +113,14 @@ charP x = Parser f
 -- But we actually want a Parser of lists
 -- [Parser Char] -> Parser [Char]
 stringP :: String -> Parser String
-stringP = sequenceA . map charP
+stringP str = 
+  Parser $ \input -> 
+    case runParser (traverse charP str) input of 
+      Left _ ->
+        Left $ 
+        ParserError
+          0 $ "Expected \"" ++ str ++ "\", but found \"" ++ input ++ "\""
+      result -> result
 
 spanP :: (Char -> Bool) -> Parser String
 spanP f = Parser $ \input -> 
@@ -164,10 +184,18 @@ statement :: Parser Statement
 statement = Statement <$> returnStatement  <*> expression <* semicolon
       -- <|>
 
+-- NOTE: Use a data structure to represent data types (int, char etc)
 returnType :: Parser ReturnType
 returnType = f <$> (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws)
   where f "int"  = ReturnType "int"
         f "void" = ReturnType "void"
+        f_        = undefined
+
+variableType :: Parser VariableType
+variableType = f <$> (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws <|> ws *> stringP "char" <* ws)
+  where f "int"  = VariableType "int"
+        f "void" = VariableType "void"
+        f "char" = VariableType "char"
         f_        = undefined
 
 -- NOTE: [a-zA-Z]\w* for now. 
@@ -175,13 +203,16 @@ returnType = f <$> (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws)
 identifier :: Parser Identifier
 identifier = Identifier <$> spanP isAlpha
 
+declaration :: Parser Declaration
+declaration = Declaration <$> variableType <*> identifier
+
 -- NOTE: Function parameters
 params :: Parser Params
 params = Params <$> (ws *> charP '(' *> ws *>
                            elements 
                            <* ws <* charP ')' <* ws)
   where
-    elements = sepBy (ws *> charP ',' <* ws) stringLiteral
+    elements = sepBy (ws *> charP ',' <* ws) declaration -- Params are obviously not string literals
 
 body :: Parser Body
 body = Body <$> (ws *> charP '{' *> ws *>

@@ -23,3 +23,35 @@ Stage 1 tests:
         no_space.c          PASS 
         wrong_case.c        PASS
 ```
+
+**23/11/2020**
+
+Generates a correct AST for the following:
+- A program containing only **main** (with or without parameters) and a **return statement**.
+The following function:
+```
+int main()
+{
+    return 2;
+}
+```
+returns the following AST:
+```
+Right (Program (Function (ReturnType "int") (Identifier "main") (Params []) (Body [Statement Return (Expression 2)])))
+```
+
+- A program containing a **simple function** (with or without parameters) and a **return statement**.
+The following funtion:
+```
+int func(int i, int j)
+{
+    return 4;
+}
+```
+returns the following AST:
+```
+Right (Program (Function (ReturnType "int") (Identifier "func") (Params [Declaration (VariableType "int") (Identifier "i"),Declaration (VariableType "int") (Identifier "j")]) (Body [Statement Return (Expression 4)])))
+```
+
+We're still a very long way from being done but it looks promising!
+
