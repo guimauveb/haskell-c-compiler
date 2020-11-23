@@ -212,7 +212,7 @@ params = Params <$> (ws *> charP '(' *> ws *>
                            elements 
                            <* ws <* charP ')' <* ws)
   where
-    elements = sepBy (ws *> charP ',' <* ws) declaration -- Params are obviously not string literals
+    elements = sepBy (ws *> charP ',' <* ws) declaration 
 
 body :: Parser Body
 body = Body <$> (ws *> charP '{' *> ws *>
