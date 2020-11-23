@@ -155,7 +155,7 @@ sepBy sep element = (:) <$> element <*> many (sep *> element)
                  <|> pure []
 
 -- NOTE: Strings can be wrapped either into single or double quotes. No escaping yet
-doubleQuotes = charP '"' *> spanP (/='"') <* charP '"'
+doubleQuotes = charP '"'  *> spanP (/='"')  <* charP '"'
 singleQuotes = charP '\'' *> spanP (/='\'') <* charP '\''
 
 stringLiteral :: Parser String
@@ -177,26 +177,30 @@ expression = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
   where f ds  = Expression $ read ds
 
 returnStatement :: Parser Statement
-returnStatement = (\_ -> Return) <$> stringP "return" <* mandWs
+returnStatement = (\_ -> Return) <$> stringP "return" <* mandWs -- There must be a white space after return
 
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
 statement :: Parser Statement
 statement = Statement <$> returnStatement  <*> expression <* semicolon
       -- <|>
 
--- NOTE: Use a data structure to represent data types (int, char etc)
+-- TODO - NOTE: Use a data structure to represent data types (int, char etc) instead of having the same code
+-- for both returnType and variableType
 returnType :: Parser ReturnType
-returnType = f <$> (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws)
+returnType = f <$> 
+  (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws <|> ws *> stringP "char" <* ws)
   where f "int"  = ReturnType "int"
         f "void" = ReturnType "void"
-        f_        = undefined
+        f "char" = ReturnType "char"
+        f_       = undefined -- Proper error message
 
 variableType :: Parser VariableType
-variableType = f <$> (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws <|> ws *> stringP "char" <* ws)
+variableType = f <$> 
+  (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws <|> ws *> stringP "char" <* ws)
   where f "int"  = VariableType "int"
         f "void" = VariableType "void"
         f "char" = VariableType "char"
-        f_        = undefined
+        f_       = undefined -- Proper error message
 
 -- NOTE: [a-zA-Z]\w* for now. 
 -- TODO - First char must be an alpha but others can be digits
