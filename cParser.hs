@@ -1,31 +1,38 @@
 {- A C compiler implementation in Haskell -}
-module Main where
+
+{-
+  Tokens:
+    Open brace {
+    Close brace }
+    Open parenthesis \(
+    Close parenthesis \)
+    Semicolon ;
+    Int keyword int
+    Return keyword return
+    Identifier [a-zA-Z]\w*
+    Integer literal [0-9]+
+-}
+
+module Parser where
 
 import Data.Char
 import Control.Applicative
 
-data Id = Id String 
-  deriving (Show)
-
+-- Function parameters
 data Params = Params [String]
-            | Empty
   deriving (Show)
 
+-- We only care about return statements for now 
 data Statement = Return
-               | Statement Statement Expression Semicolon
+               | Statement Statement Expression -- Mandatory semicolon
   deriving (Show)
 
-data Semicolon = Semicolon
-  deriving (Show)
-
--- NOTE: Only accepts an integer for now. TODO: <= INT_MAX
+-- NOTE: Only accepts an integer for now. 
 data Expression = Expression Integer
   deriving (Show)
 
+-- A function body will be reduced to a list of statements for the moment
 data Body = Body [Statement]
-  deriving (Show)
-
-data Function = Function ReturnType Identifier Params Body
   deriving (Show)
 
 data Identifier = Identifier String
@@ -34,26 +41,17 @@ data Identifier = Identifier String
 data ReturnType = ReturnType String
   deriving (Show)
 
+data Function = Function ReturnType Identifier Params Body
+  deriving (Show)
+
 data Program = Program Function
   deriving (Show)
 
-{-
-  Open brace {
-  Close brace }
-  Open parenthesis \(
-  Close parenthesis \)
-  Semicolon ;
-  Int keyword int
-  Return keyword return
-  Identifier [a-zA-Z]\w*
-  Integer literal [0-9]+
--}
 
 -- NOTE: To get a proper error reporting we could use Either (Int, Int, String) (String, a) 
 -- Here we return what the parser has consumed, and the rest of the input to pass it to the next parser
 newtype Parser a = Parser 
-  { runParser :: String -> Maybe (String, a) 
-  }
+  { runParser :: String -> Maybe (String, a) }
 
 instance Functor Parser where
   fmap f (Parser p) =
@@ -88,7 +86,6 @@ charP x = Parser f
 -- NOTE: To use charP over a string we could simply use map, but we would obtain a list of Parser Char
 -- But we actually want a Parser of lists
 -- [Parser Char] -> Parser [Char]
-
 stringP :: String -> Parser String
 stringP = sequenceA . map charP
 
@@ -114,6 +111,9 @@ ws = spanP isSpace
 mandWs :: Parser String
 mandWs = spanP (not . isSpace)
 
+semicolon :: Parser String
+semicolon = ws <* charP ';'
+
 -- NOTE: many applies a function on its input until it fails:
 -- Running runParser jsonNull "nullnullnull" would produce Just("nullnull", JsonNull), adding many:
 --         runParser (many jsonNull "nullnullnull" will produce (Just "", JsonNull, JsonNull, JsonNull) 
@@ -127,9 +127,6 @@ singleQuotes = charP '\'' *> spanP (/='\'') <* charP '\''
 
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
-
-semiColon :: Parser Semicolon
-semiColon = (\_ -> Semicolon) <$> stringP ";"
 
 int_max = 2147483647
 
@@ -149,9 +146,9 @@ expression = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> stringP "return" <* mandWs
 
--- NOTE: Can be a lot of things
+-- NOTE: Can be a lot of things (but always ends with a semicolon)
 statement :: Parser Statement
-statement = Statement <$> returnStatement  <*> expression <*> semiColon
+statement = Statement <$> returnStatement  <*> expression <* semicolon
       -- <|>
 
 returnType :: Parser ReturnType
@@ -160,7 +157,8 @@ returnType = f <$> (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws)
         f "void" = ReturnType "void"
         f_        = undefined
 
--- NOTE: [a-zA-Z]\w* for now. First char must be an alpha but others can be digits
+-- NOTE: [a-zA-Z]\w* for now. 
+-- TODO - First char must be an alpha but others can be digits
 identifier :: Parser Identifier
 identifier = Identifier <$> spanP isAlpha
 
@@ -191,7 +189,13 @@ parseFile filename parser = do
   input <- readFile filename 
   return (snd <$> runParser parser input)
 
-main = undefined
+-- TODO: Traverse the AST and generate the assembly code
+generateAssembly :: Maybe Program -> String
+generateAssembly = undefined
+
+
+
+
 
 
 
