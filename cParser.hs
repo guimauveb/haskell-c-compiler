@@ -1,18 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
-{- A C compiler implementation in Haskell -}
 
-{-
-  Tokens:
-    Open brace {
-    Close brace }
-    Open parenthesis \(
-    Close parenthesis \)
-    Semicolon ;
-    Int keyword int
-    Return keyword return
-    Identifier [a-zA-Z]\w*
-    Integer literal [0-9]+
--}
+{- λ C compiler implementation in Haskell -}
 
 module Parser where
 
@@ -101,7 +89,6 @@ charP :: Char -> Parser Char
 charP x = Parser f
   where 
     f (y:ys)
-      -- Condition guards
         | y == x    = Right (ys, x)
         | otherwise = Left $ 
                       ParserError 
