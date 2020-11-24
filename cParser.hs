@@ -49,11 +49,11 @@ data Function = Function ReturnType Identifier Params Body
 data Program = Program Function
   deriving (Show)
 
-data ParserError = ParserError Int String 
+data ParseError = ParseError Int String 
   deriving (Show) 
 
-instance Alternative (Either ParserError) where
-    empty        = Left $ ParserError 1 "Empty."
+instance Alternative (Either ParseError) where
+    empty        = Left $ ParseError 1 "Empty."
     Left _ <|> n = n
     m      <|> _ = m
 
@@ -62,7 +62,7 @@ instance Alternative (Either ParserError) where
 -- Here we return what the parser has consumed, and the rest of the input to pass it to the next parser
 -- For now we only return Either "an error message" or the actual value
 newtype Parser a = Parser 
-  { runParser :: String -> Either ParserError (String, a) }
+  { runParser :: String -> Either ParseError (String, a) }
 
 instance Functor Parser where
   fmap f (Parser p) =
@@ -79,7 +79,7 @@ instance Applicative Parser where
     Right (input'', f a)
 
 instance Alternative Parser where
-  empty = Parser $ \_ -> Left $ ParserError 0 "empty"
+  empty = Parser $ \_ -> Left $ ParseError 0 "empty"
   (Parser p1) <|> (Parser p2) = 
     Parser $ \input -> p1 input <|> p2 input
 
@@ -91,10 +91,9 @@ charP x = Parser f
     f (y:ys)
         | y == x    = Right (ys, x)
         | otherwise = Left $ 
-                      ParserError 
+                      ParseError 
                       0 $ "Expected '" ++ [x] ++ "', but found '" ++ [y] ++ "'"
-        where str = y:ys
-    f [] = Left $ ParserError 0 "Empty string."
+    f [] = Left $ ParseError 0 "Empty string."
 
 -- NOTE: To use charP over a string we could simply use map, but we would obtain a list of Parser Char
 -- But we actually want a Parser of lists
@@ -105,7 +104,7 @@ stringP str =
     case runParser (traverse charP str) input of 
       Left _ ->
         Left $ 
-        ParserError
+        ParseError
           0 $ "Expected \"" ++ str ++ "\", but found \"" ++ input ++ "\""
       result -> result
 
@@ -119,7 +118,17 @@ notNull (Parser p) =
   Parser $ \input -> do
     (input', xs) <- p input
     if null xs
-       then Left $ ParserError 0 "Value is null."
+       then Left $ ParseError 0 "Value is null."
+    else Right (input', xs)
+
+int_max = 2147483647
+
+isIntMax :: Parser String -> Parser String
+isIntMax (Parser p) = 
+  Parser $ \input -> do
+    (input', xs) <- p input
+    if read xs > int_max 
+       then Left $ ParseError 0 "Integer must be <= INT_MAX."
     else Right (input', xs)
 
 -- NOTE: discard whitespace 
@@ -147,16 +156,6 @@ singleQuotes = charP '\'' *> spanP (/='\'') <* charP '\''
 
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
-
-int_max = 2147483647
-
-isIntMax :: Parser String -> Parser String
-isIntMax (Parser p) = 
-  Parser $ \input -> do
-    (input', xs) <- p input
-    if read xs > int_max 
-       then Left $ ParserError 0 "Integer must be <= INT_MAX."
-    else Right (input', xs)
 
 -- NOTE: Only parses an int for now
 expression :: Parser Expression
@@ -219,7 +218,7 @@ function = Function <$> returnType <*> identifier <*> params <*> body
 program :: Parser Program
 program = Program <$> function
 
-parseFile :: FilePath -> Parser a -> IO (Either ParserError a)
+parseFile :: FilePath -> Parser a -> IO (Either ParseError a)
 parseFile filename parser = do
   input <- readFile filename 
   return (snd <$> runParser parser input)
