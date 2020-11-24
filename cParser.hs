@@ -1,6 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-{- λ C compiler implementation in Haskell -}
+{- λ C compiler implementation in Haskell 
+
+TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
+an error occurs in stringP (let's say when "return" isn't matched) the error displayed doesn't come from stringP 
+but from charP trying to parse the character that follows "return", even though the error occured in stringP! 
+
+-}
+
 
 module Parser where
 
@@ -17,10 +24,6 @@ data Input = Input
 data Declaration = Declaration VariableType Identifier 
   deriving (Show)
 
--- Function parameters
-data Params = Params [Declaration]
-  deriving (Show)
-
 -- We only care about return statements for now 
 data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
@@ -30,17 +33,21 @@ data Statement = Return
 data Expression = Expression Integer
   deriving (Show)
 
--- A function body will be reduced to a list of statements for the moment
-data Body = Body [Statement]
+data VariableType = VariableType String
+  deriving (Show)
+
+data ReturnType = ReturnType String
   deriving (Show)
 
 data Identifier = Identifier String
   deriving (Show)
 
-data VariableType = VariableType String
+-- Function parameters
+data Params = Params [Declaration]
   deriving (Show)
 
-data ReturnType = ReturnType String
+-- A function body will be reduced to a list of statements for the moment
+data Body = Body [Statement]
   deriving (Show)
 
 data Function = Function ReturnType Identifier Params Body
@@ -57,10 +64,6 @@ instance Alternative (Either ParseError) where
     Left _ <|> n = n
     m      <|> _ = m
 
-
--- NOTE: To get a proper error reporting we could use Either (Int, Int, String) (String, a) 
--- Here we return what the parser has consumed, and the rest of the input to pass it to the next parser
--- For now we only return Either "an error message" or the actual value
 newtype Parser a = Parser 
   { runParser :: String -> Either ParseError (String, a) }
 
