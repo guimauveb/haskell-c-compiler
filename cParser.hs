@@ -83,7 +83,6 @@ haskii = ["",
          "A Haskell C compiler by guimauve..."
         ]
 
-
 instance Alternative (Either ParseError) where
     empty        = Left $ ParseError 1 "Empty."
     Left _ <|> n = n
@@ -111,13 +110,13 @@ instance Alternative Parser where
   (Parser p1) <|> (Parser p2) = 
     Parser $ \input -> p1 input <|> p2 input
 
-
 -- DOING: Error checking
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
 instance Show ParseError where show = showError
 
+-- TODO - Implement ParseError using catchError from Control.Monad
 -- trapError action = catchError action (return . show)
 
 -- NOTE: Using where notation instead of lambda notation
