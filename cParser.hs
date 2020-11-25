@@ -5,9 +5,12 @@
 \\\ \\\ 
  \\\ \\\ 
   \\\ \\\  \\\\\\\\ 
-  /// //\\ 
+  /// //\\   Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ
  /// ///\\\ \\\\\\\\ 
 /// ///  \\\ 
+       mov
+       eax
+        7
 
 TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
 an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from 
