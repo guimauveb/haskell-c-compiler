@@ -2,19 +2,26 @@
 
 {- λ C compiler implementation in Haskell 
 
+\\\ \\\
+ \\\ \\\  
+  \\\ \\\  \\\\\\\\
+  /// //\\
+ /// ///\\\ \\\\\\\\
+/// ///  \\\ 
+
 TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
-an error occurs in stringP (let's say when "return" isn't matched) the error displayed doesn't come from stringP 
-but from charP trying to parse the character that follows "return", even though the error occured in stringP! 
+an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from parseString 
+but from parseChar trying to parse the character that follows "return", even though the error occured in parseString! 
 
 -}
 
-
-module Parser where
+module Main where
 
 import Data.Either
 import Prelude
 import Data.Char
 import Control.Applicative
+import System.Environment
 
 data Input = Input 
   { location :: Int
@@ -57,7 +64,7 @@ data Program = Program Function
   deriving (Show)
 
 data ParseError = ParseError Int String 
-  deriving (Show) 
+--  deriving (Show) 
 
 instance Alternative (Either ParseError) where
     empty        = Left $ ParseError 1 "Empty."
@@ -87,28 +94,36 @@ instance Alternative Parser where
     Parser $ \input -> p1 input <|> p2 input
 
 
+-- DOING: Error checking
+showError :: ParseError -> String
+showError (ParseError loc var) = show loc ++ var
+
+instance Show ParseError where show = showError
+
+-- trapError action = catchError action (return . show)
+
 -- NOTE: Using where notation instead of lambda notation
-charP :: Char -> Parser Char
-charP x = Parser f
+parseChar :: Char -> Parser Char
+parseChar x = Parser f
   where 
     f (y:ys)
         | y == x    = Right (ys, x)
         | otherwise = Left $ 
                       ParseError 
-                      0 $ "Expected '" ++ [x] ++ "', but found '" ++ [y] ++ "'"
-    f [] = Left $ ParseError 0 "Empty string."
+                      0 $ " Expected '" ++ [x] ++ "', but found '" ++ [y] ++ "'"
+    f [] = Left $ ParseError 0 " Empty string."
 
--- NOTE: To use charP over a string we could simply use map, but we would obtain a list of Parser Char
+-- NOTE: To use parseChar over a string we could simply use map, but we would obtain a list of Parser Char
 -- But we actually want a Parser of lists
 -- [Parser Char] -> Parser [Char]
-stringP :: String -> Parser String
-stringP str = 
+parseString :: String -> Parser String
+parseString str = 
   Parser $ \input -> 
-    case runParser (traverse charP str) input of 
+    case runParser (traverse parseChar str) input of 
       Left _ ->
         Left $ 
         ParseError
-          0 $ "Expected \"" ++ str ++ "\", but found \"" ++ input ++ "\""
+          0 $ " Expected \"" ++ str ++ "\", but found \"" ++ input ++ "\""
       result -> result
 
 spanP :: (Char -> Bool) -> Parser String
@@ -121,7 +136,7 @@ notNull (Parser p) =
   Parser $ \input -> do
     (input', xs) <- p input
     if null xs
-       then Left $ ParseError 0 "Value is null."
+       then Left $ ParseError 0 " Value is null."
     else Right (input', xs)
 
 int_max = 2147483647
@@ -131,7 +146,7 @@ isIntMax (Parser p) =
   Parser $ \input -> do
     (input', xs) <- p input
     if read xs > int_max 
-       then Left $ ParseError 0 "Integer must be <= INT_MAX."
+       then Left $ ParseError 0 " Integer must be <= INT_MAX."
     else Right (input', xs)
 
 -- NOTE: discard whitespace 
@@ -144,7 +159,7 @@ mandWs :: Parser String
 mandWs = spanP (not . isSpace)
 
 semicolon :: Parser String
-semicolon = ws <* charP ';'
+semicolon = ws <* parseChar ';'
 
 -- NOTE: many applies a function on its input until it fails:
 -- Running runParser jsonNull "nullnullnull" would produce Right("nullnull", JsonNull), adding many:
@@ -154,8 +169,8 @@ sepBy sep element = (:) <$> element <*> many (sep *> element)
                  <|> pure []
 
 -- NOTE: Strings can be wrapped either into single or double quotes. No escaping yet
-doubleQuotes = charP '"'  *> spanP (/='"')  <* charP '"'
-singleQuotes = charP '\'' *> spanP (/='\'') <* charP '\''
+doubleQuotes = parseChar '"'  *> spanP (/='"')  <* parseChar '"'
+singleQuotes = parseChar '\'' *> spanP (/='\'') <* parseChar '\''
 
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
@@ -166,7 +181,7 @@ expression = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
   where f ds  = Expression $ read ds
 
 returnStatement :: Parser Statement
-returnStatement = (\_ -> Return) <$> stringP "return" <* mandWs -- There must be a white space after return
+returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
 
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
 statement :: Parser Statement
@@ -177,7 +192,7 @@ statement = Statement <$> returnStatement  <*> expression <* semicolon
 -- for both returnType and variableType
 returnType :: Parser ReturnType
 returnType = f <$> 
-  (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws <|> ws *> stringP "char" <* ws)
+  (ws *> parseString "int" <* ws <|> ws *> parseString "void" <* ws <|> ws *> parseString "char" <* ws)
   where f "int"  = ReturnType "int"
         f "void" = ReturnType "void"
         f "char" = ReturnType "char"
@@ -185,7 +200,7 @@ returnType = f <$>
 
 variableType :: Parser VariableType
 variableType = f <$> 
-  (ws *> stringP "int" <* ws <|> ws *> stringP "void" <* ws <|> ws *> stringP "char" <* ws)
+  (ws *> parseString "int" <* ws <|> ws *> parseString "void" <* ws <|> ws *> parseString "char" <* ws)
   where f "int"  = VariableType "int"
         f "void" = VariableType "void"
         f "char" = VariableType "char"
@@ -201,16 +216,16 @@ declaration = Declaration <$> variableType <*> identifier
 
 -- NOTE: Function parameters
 params :: Parser Params
-params = Params <$> (ws *> charP '(' *> ws *>
+params = Params <$> (ws *> parseChar '(' *> ws *>
                            elements 
-                           <* ws <* charP ')' <* ws)
+                           <* ws <* parseChar ')' <* ws)
   where
-    elements = sepBy (ws *> charP ',' <* ws) declaration 
+    elements = sepBy (ws *> parseChar ',' <* ws) declaration 
 
 body :: Parser Body
-body = Body <$> (ws *> charP '{' *> ws *>
+body = Body <$> (ws *> parseChar '{' *> ws *>
                            statements 
-                           <* ws <* charP '}')
+                           <* ws <* parseChar '}')
   where
     statements = sepBy (ws) statement
 
@@ -224,15 +239,23 @@ program = Program <$> function
 parseFile :: FilePath -> Parser a -> IO (Either ParseError a)
 parseFile filename parser = do
   input <- readFile filename 
-  return (snd <$> runParser parser input)
+  case runParser parser input of
+    Left e       -> return $ Left e
+    Right (_, x) -> return $ Right x
 
 -- TODO: Traverse the AST and generate the assembly code
 generateAssembly :: Maybe Program -> String
 generateAssembly = undefined
 
-
-
-
+main :: IO ()
+main = getArgs >>= \ args ->
+       readFile (args !! 0) >>= \ source ->
+       putStrLn ("[INFO] Parsing source file '" ++ args !! 0 ++ "'") >>
+       case runParser program source of
+        Right (source, ast) -> do
+          putStrLn ("[INFO] Parsed as:\n" ++ show ast)
+        Left e -> do
+          putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
 
 
 
