@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-{- λ C compiler implementation in Haskell 
+{- C compiler implementation in Haskell 
 
 \\\ \\\
  \\\ \\\  
@@ -10,15 +10,14 @@
 /// ///  \\\ 
 
 TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
-an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from parseString 
-but from parseChar trying to parse the character that follows "return", even though the error occured in parseString! 
+an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from 
+parseString but from parseChar trying to parse the character that follows "return", even though the error occured
+in parseString! 
 
 -}
 
 module Main where
 
-import Data.Either
-import Prelude
 import Data.Char
 import Control.Applicative
 import System.Environment
@@ -235,13 +234,6 @@ function = Function <$> returnType <*> identifier <*> params <*> body
 -- NOTE: Program must return a list of functions
 program :: Parser Program
 program = Program <$> function
-
-parseFile :: FilePath -> Parser a -> IO (Either ParseError a)
-parseFile filename parser = do
-  input <- readFile filename 
-  case runParser parser input of
-    Left e       -> return $ Left e
-    Right (_, x) -> return $ Right x
 
 -- TODO: Traverse the AST and generate the assembly code
 generateAssembly :: Maybe Program -> String
