@@ -2,11 +2,11 @@
 
 {- C compiler implementation in Haskell 
 
-\\\ \\\
- \\\ \\\  
-  \\\ \\\  \\\\\\\\
-  /// //\\
- /// ///\\\ \\\\\\\\
+\\\ \\\ 
+ \\\ \\\ 
+  \\\ \\\  \\\\\\\\ 
+  /// //\\ 
+ /// ///\\\ \\\\\\\\ 
 /// ///  \\\ 
 
 TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
@@ -64,6 +64,22 @@ data Program = Program Function
 
 data ParseError = ParseError Int String 
 --  deriving (Show) 
+
+-- Pun intended
+haskii = ["",
+         "\\\\\\ \\\\\\ ", 
+         " \\\\\\ \\\\\\ ",
+         "  \\\\\\ \\\\\\  \\\\\\\\\\\\\\\\ ",
+         "  /// //\\\\   Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ",
+         " /// ///\\\\\\ \\\\\\\\\\\\\\\\ ",
+         "/// ///  \\\\\\ ",
+         "       mov",
+         "       eax",
+         "        7",
+         "",
+         "A Haskell C compiler by guimauve..."
+        ]
+
 
 instance Alternative (Either ParseError) where
     empty        = Left $ ParseError 1 "Empty."
@@ -239,14 +255,16 @@ program = Program <$> function
 generateAssembly :: Maybe Program -> String
 generateAssembly = undefined
 
+
 main :: IO ()
 main = getArgs >>= \ args ->
        readFile (args !! 0) >>= \ source ->
+       putStrLn (unlines haskii) >>
        putStrLn ("[INFO] Parsing source file '" ++ args !! 0 ++ "'") >>
        case runParser program source of
-        Right (source, ast) -> do
+        Right (source, ast) -> 
           putStrLn ("[INFO] Parsed as:\n" ++ show ast)
-        Left e -> do
+        Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
 
 
