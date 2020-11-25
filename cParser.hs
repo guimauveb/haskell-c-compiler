@@ -258,7 +258,6 @@ program = Program <$> function
 generateAssembly :: Maybe Program -> String
 generateAssembly = undefined
 
-
 main :: IO ()
 main = getArgs >>= \ args ->
        readFile (args !! 0) >>= \ source ->
