@@ -53,5 +53,8 @@ returns the following AST:
 Right (Program (Function (ReturnType "int") (Identifier "func") (Params [Declaration (VariableType "int") (Identifier "i"),Declaration (VariableType "int") (Identifier "j")]) (Body [Statement Return (Expression 4)])))
 ```
 
-We're still a very long way from being done but it looks promising!
+**26/11/20**
+
+Generates proper assembly for all stage 1 valid examples !
+
 
