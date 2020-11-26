@@ -252,14 +252,10 @@ function = Function <$> returnType <*> identifier <*> params <*> body
 program :: Parser Program
 program = Program <$> function
 
-
--- Assembly generation
+-- The following block of code is dedicated to assembly generation. I should put it in a separate module.
 generateExpression :: Expression -> String
 generateExpression (Expression ex) = show ex
 
--- Generate a return statement (return 2):
--- movl   $2, $eax
--- ret
 generateStatement :: [Statement] -> String
 generateStatement ([Statement s ex]) 
   | (s==Return) = "movl     $" ++ 
@@ -278,10 +274,6 @@ generateParams (Params (x:xs)) = undefined
 generateFunctionHead :: Identifier -> String
 generateFunctionHead (Identifier i) = ".globl _" ++ i ++ "\n" ++ i ++ ":\n"
 
--- Generate a function (function "foo"):
--- .globl _foo
--- _foo:
--- <FUNCTION BODY>
 generateFunction :: Function -> String
 generateFunction (Function ret id params body) = generateFunctionHead id ++
                                                  generateBody body
@@ -298,8 +290,8 @@ main = getArgs >>= \ args ->
        putStrLn ("[INFO] Parsing source file '" ++ args !! 0 ++ "'") >>
        case runParser program source of
         Right (source, ast) -> 
-          putStrLn ("[INFO] Parsed as: (NOTE: Pretty print it)\n" ++ show ast ++ "\n") >>
-          putStrLn ( "[INFO] Assembly:") >>
+          putStrLn ("[INFO] Parsed as the following AST: (NOTE: Pretty print it)\n" ++ show ast ++ "\n") >>
+          putStrLn ("[INFO] Assembly:") >>
           putStrLn (generateAssembly ast)
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
