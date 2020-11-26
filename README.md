@@ -55,6 +55,19 @@ Right (Program (Function (ReturnType "int") (Identifier "func") (Params [Declara
 
 **26/11/20**
 
-Generates proper assembly for all stage 1 valid examples !
+Generates proper assembly for all stage 1 valid examples!
+
+Usage : 
+```
+    $ ghc cParser.hs -o cParser
+    $ ./cParser some_very_basic_c_file.c assembly.s
+```
+
+To link it and generate a vaid executable we do the following:
+```
+    $ gcc assembly.s -o out
+```
+
+And it works!
 
 

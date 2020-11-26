@@ -118,7 +118,6 @@ instance Show ParseError where show = showError
 -- TODO - Implement ParseError using catchError from Control.Monad
 -- trapError action = catchError action (return . show)
 
--- NOTE: Using where notation instead of lambda notation
 parseChar :: Char -> Parser Char
 parseChar x = Parser f
   where 
@@ -178,8 +177,6 @@ semicolon :: Parser String
 semicolon = ws <* parseChar ';'
 
 -- NOTE: many applies a function on its input until it fails:
--- Running runParser jsonNull "nullnullnull" would produce Right("nullnull", JsonNull), adding many:
---         runParser (many jsonNull "nullnullnull" will produce (Right "", JsonNull, JsonNull, JsonNull) 
 sepBy :: Parser a -> Parser b -> Parser [b]
 sepBy sep element = (:) <$> element <*> many (sep *> element) 
                  <|> pure []
@@ -260,9 +257,10 @@ generateStatement :: [Statement] -> String
 generateStatement ([Statement s ex]) 
   | (s==Return) = "movl     $" ++ 
                   generateExpression ex ++
-                  ", %eax"
+                  ", %eax" ++ 
+                  "\n" ++
+                  "ret"
   | otherwise   = ""
--- Statement Statement Expression -- Mandatory semicolon
 
 generateBody :: Body -> String
 generateBody (Body s) = generateStatement s
@@ -272,7 +270,9 @@ generateParams (Params [])= undefined
 generateParams (Params (x:xs)) = undefined
 
 generateFunctionHead :: Identifier -> String
-generateFunctionHead (Identifier i) = ".globl _" ++ i ++ "\n" ++ i ++ ":\n"
+generateFunctionHead (Identifier i) = ".globl _" ++ i ++ 
+                                      "\n_" ++ i ++
+                                      ":\n"
 
 generateFunction :: Function -> String
 generateFunction (Function ret id params body) = generateFunctionHead id ++
@@ -283,6 +283,7 @@ generateAssembly :: Program -> String
 generateAssembly (Program f) = generateFunction f 
  
 
+-- TODO: Error checking
 main :: IO ()
 main = getArgs >>= \ args ->
        readFile (args !! 0) >>= \ source ->
@@ -292,9 +293,11 @@ main = getArgs >>= \ args ->
         Right (source, ast) -> 
           putStrLn ("[INFO] Parsed as the following AST: (NOTE: Pretty print it)\n" ++ show ast ++ "\n") >>
           putStrLn ("[INFO] Assembly:") >>
-          putStrLn (generateAssembly ast)
+          putStrLn (asm) >>
+          writeFile (args !! 1) (asm) >>
+          putStrLn ("[INFO] Assembly code was written to " ++ (args !! 1))
+            where 
+              asm = generateAssembly ast
+          
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
-
-
-
