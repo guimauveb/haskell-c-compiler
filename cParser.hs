@@ -31,42 +31,42 @@ data Input = Input
   } deriving (Show, Eq)
 
 data Declaration = Declaration VariableType Identifier 
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- We only care about return statements for now 
 data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- NOTE: Only accepts an integer for now. 
 data Expression = Expression Integer
-  deriving (Show)
+  deriving (Show, Eq)
 
 data VariableType = VariableType String
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ReturnType = ReturnType String
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Identifier = Identifier String
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- Function parameters
 data Params = Params [Declaration]
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- A function body will be reduced to a list of statements for the moment
 data Body = Body [Statement]
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Function = Function ReturnType Identifier Params Body
-  deriving (Show)
+  deriving (Show, Eq)
 
 data Program = Program Function
-  deriving (Show)
+  deriving (Show, Eq)
 
 data ParseError = ParseError Int String 
---  deriving (Show) 
+--  deriving (Show, Eq) 
 
 -- Pun intended
 haskii = ["",
@@ -115,7 +115,6 @@ showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
 instance Show ParseError where show = showError
-
 -- TODO - Implement ParseError using catchError from Control.Monad
 -- trapError action = catchError action (return . show)
 
@@ -253,9 +252,38 @@ function = Function <$> returnType <*> identifier <*> params <*> body
 program :: Parser Program
 program = Program <$> function
 
+
+-- Assembly generation
+generateExpression :: Expression -> String
+generateExpression = undefined
+
+-- Generate a return statement (return 2):
+-- movl   $2, $eax
+-- ret
+generateStatement :: Statement -> String
+generateStatement (Statement s ex) = "" 
+-- Statement Statement Expression -- Mandatory semicolon
+
+generateBody :: Body -> String
+generateBody b = undefined
+
+generateParams :: Params -> String
+generateParams (Params [])= undefined
+generateParams (Params (x:xs)) = undefined
+
+-- Generate a function (function "foo"):
+-- .globl _foo
+-- _foo:
+-- <FUNCTION BODY>
+generateFunction :: Function -> String
+-- Decompose in the body (?)
+generateFunction (Function retType (Identifier n) params body) = ".globl _" ++ n ++ "\n" ++ n ++ ":\n"
+
 -- TODO: Traverse the AST and generate the assembly code
-generateAssembly :: Maybe Program -> String
-generateAssembly = undefined
+generateAssembly :: Program -> String
+generateAssembly (Program f) = generateFunction f 
+ 
+
 
 main :: IO ()
 main = getArgs >>= \ args ->
@@ -264,7 +292,9 @@ main = getArgs >>= \ args ->
        putStrLn ("[INFO] Parsing source file '" ++ args !! 0 ++ "'") >>
        case runParser program source of
         Right (source, ast) -> 
-          putStrLn ("[INFO] Parsed as:\n" ++ show ast)
+          putStrLn ("[INFO] Parsed as: (NOTE: Pretty print it)\n" ++ show ast ++ "\n") >>
+          putStrLn ( "[INFO] Assembly:") >>
+          putStrLn (generateAssembly ast)
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
 
