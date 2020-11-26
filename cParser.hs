@@ -255,35 +255,41 @@ program = Program <$> function
 
 -- Assembly generation
 generateExpression :: Expression -> String
-generateExpression = undefined
+generateExpression (Expression ex) = show ex
 
 -- Generate a return statement (return 2):
 -- movl   $2, $eax
 -- ret
-generateStatement :: Statement -> String
-generateStatement (Statement s ex) = "" 
+generateStatement :: [Statement] -> String
+generateStatement ([Statement s ex]) 
+  | (s==Return) = "movl     $" ++ 
+                  generateExpression ex ++
+                  ", %eax"
+  | otherwise   = ""
 -- Statement Statement Expression -- Mandatory semicolon
 
 generateBody :: Body -> String
-generateBody b = undefined
+generateBody (Body s) = generateStatement s
 
 generateParams :: Params -> String
 generateParams (Params [])= undefined
 generateParams (Params (x:xs)) = undefined
+
+generateFunctionHead :: Identifier -> String
+generateFunctionHead (Identifier i) = ".globl _" ++ i ++ "\n" ++ i ++ ":\n"
 
 -- Generate a function (function "foo"):
 -- .globl _foo
 -- _foo:
 -- <FUNCTION BODY>
 generateFunction :: Function -> String
--- Decompose in the body (?)
-generateFunction (Function retType (Identifier n) params body) = ".globl _" ++ n ++ "\n" ++ n ++ ":\n"
+generateFunction (Function ret id params body) = generateFunctionHead id ++
+                                                 generateBody body
 
 -- TODO: Traverse the AST and generate the assembly code
 generateAssembly :: Program -> String
 generateAssembly (Program f) = generateFunction f 
  
-
 
 main :: IO ()
 main = getArgs >>= \ args ->
