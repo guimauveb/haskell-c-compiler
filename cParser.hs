@@ -282,7 +282,6 @@ generateFunction (Function ret id params body) = generateFunctionHead id ++
 generateAssembly :: Program -> String
 generateAssembly (Program f) = generateFunction f 
  
-
 -- TODO: Error checking
 main :: IO ()
 main = getArgs >>= \ args ->
