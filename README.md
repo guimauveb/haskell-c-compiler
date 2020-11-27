@@ -4,7 +4,6 @@ From Nora Sandler's article [Write a C Compiler](https://norasandler.com/2017/11
 
 With the help of Tsoding great video [JSON Parser 100% From Scratch in Haskell](https://www.youtube.com/watch?v=N9RUqGYuGfw&t=957s)
 
-**11/11/2020**
 ```
 Stage 1 tests:
     Valid:
@@ -23,8 +22,6 @@ Stage 1 tests:
         no_space.c          PASS 
         wrong_case.c        PASS
 ```
-
-**23/11/2020**
 
 Generates a correct AST for the following:
 - A program containing only **main** (with or without parameters) and a **return statement**.
@@ -52,8 +49,6 @@ returns the following AST:
 ```
 Right (Program (Function (ReturnType "int") (Identifier "func") (Params [Declaration (VariableType "int") (Identifier "i"),Declaration (VariableType "int") (Identifier "j")]) (Body [Statement Return (Expression 4)])))
 ```
-
-**26/11/20**
 
 Generates proper assembly for all stage 1 valid examples!
 
