@@ -21,9 +21,25 @@ in parseString!
 
 module Main where
 
-import Data.Char
+import Control.Monad
 import Control.Applicative
+
+import Data.Char
+import Data.List
+import Data.Maybe
+
+import System.Console.GetOpt
 import System.Environment
+import System.Exit
+import System.IO
+
+import Text.Printf
+
+data Flag = Blanks
+          | InstructionSet String
+          | AssemblyFile String
+          | Help
+          deriving (Eq,Show)
 
 data Input = Input 
   { location :: Int
@@ -118,6 +134,7 @@ instance Show ParseError where show = showError
 -- TODO - Implement ParseError using catchError from Control.Monad
 -- trapError action = catchError action (return . show)
 
+-- NOTE: Using where notation instead of lambda notation
 parseChar :: Char -> Parser Char
 parseChar x = Parser f
   where 
@@ -177,6 +194,8 @@ semicolon :: Parser String
 semicolon = ws <* parseChar ';'
 
 -- NOTE: many applies a function on its input until it fails:
+-- Running runParser jsonNull "nullnullnull" would produce Right("nullnull", JsonNull), adding many:
+--         runParser (many jsonNull "nullnullnull" will produce (Right "", JsonNull, JsonNull, JsonNull) 
 sepBy :: Parser a -> Parser b -> Parser [b]
 sepBy sep element = (:) <$> element <*> many (sep *> element) 
                  <|> pure []
@@ -261,6 +280,7 @@ generateStatement ([Statement s ex])
                   "\n" ++
                   "ret"
   | otherwise   = ""
+-- Statement Statement Expression -- Mandatory semicolon
 
 generateBody :: Body -> String
 generateBody (Body s) = generateStatement s
@@ -281,22 +301,67 @@ generateFunction (Function ret id params body) = generateFunctionHead id ++
 -- TODO: Traverse the AST and generate the assembly code
 generateAssembly :: Program -> String
 generateAssembly (Program f) = generateFunction f 
- 
--- TODO: Error checking
+
+flags :: [OptDescr Flag]
+flags = [Option ['i'] [] (ReqArg InstructionSet "") ""
+        ,Option ['o'] [] (ReqArg AssemblyFile "") ""
+        ,Option []    ["help"] (NoArg Help) "Print this help message"
+        ]
+
+-- Arguments handling
+parse argv = case getOpt Permute flags argv of
+              (args, fs, []) -> do
+                let files = if null fs then ["-"] else fs
+                if Help `elem` args 
+                  then do hPutStrLn stderr (usageInfo header flags)
+                          exitWith ExitSuccess
+                  else return (nub (concatMap set args), files)
+
+              (_,_,errs)    -> do
+                hPutStrLn stderr (concat errs ++ usageInfo header flags)
+                exitWith (ExitFailure 1)
+              where header = "Usage: cParser <source.c> [-o] <assembly.s> [-i] <instruction_set>"
+                    set f = [f]
+
+-- These two functions do basically the same thing. They take a list of flags and match a datatype then return its
+-- string value. See how I could abstract them so that I can pass any datatype and abstract away its string value.
+-- Like so: filterFlag Flag <anyStr> -> anyStr
+-- Or at least return the consumed input and the rest of the list, so we don't move the list around with already
+-- parsed values.
+filterInstructionSet :: [Flag] -> String
+filterInstructionSet list = 
+  case head [x | x@(InstructionSet _) <- list] of 
+    InstructionSet i -> i 
+    empty -> "Could not match flag in the list of arguments." -- Not matched!
+
+filterAssemblyOutput :: [Flag] -> String
+filterAssemblyOutput list = 
+  case head [x | x@(AssemblyFile _) <- list] of 
+    AssemblyFile a -> a
+    empty -> "Could not match flag in the list of arguments." -- Not matched!
+
+
 main :: IO ()
-main = getArgs >>= \ args ->
-       readFile (args !! 0) >>= \ source ->
-       putStrLn (unlines haskii) >>
-       putStrLn ("[INFO] Parsing source file '" ++ args !! 0 ++ "'") >>
+main = do
+  putStrLn (unlines haskii) 
+  (as, fs) <- getArgs >>= parse
+  let ins = filterInstructionSet as 
+      ass = filterAssemblyOutput as
+      file = fs !! 0
+  putStrLn $ "Instruction set: "            ++ ins -- NOTE: Only x86 for now
+  putStrLn ("[INFO] Parsing source file '" ++ show (fs !! 0) ++ "'") >>
+    readFile file >>= \ source ->
        case runParser program source of
         Right (source, ast) -> 
           putStrLn ("[INFO] Parsed as the following AST: (NOTE: Pretty print it)\n" ++ show ast ++ "\n") >>
           putStrLn ("[INFO] Assembly:") >>
-          putStrLn (asm) >>
-          writeFile (args !! 1) (asm) >>
-          putStrLn ("[INFO] Assembly code was written to " ++ (args !! 1))
+          putStrLn asm >>
+          writeFile ass asm >>
+          putStrLn ("Assembly was written to " ++ ass)
             where 
               asm = generateAssembly ast
-          
+
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
+
+
