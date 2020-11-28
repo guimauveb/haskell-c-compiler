@@ -302,13 +302,13 @@ generateFunction (Function ret id params body) = generateFunctionHead id ++
 generateAssembly :: Program -> String
 generateAssembly (Program f) = generateFunction f 
 
+-- Arguments handling
 flags :: [OptDescr Flag]
 flags = [Option ['i'] [] (ReqArg InstructionSet "") ""
         ,Option ['o'] [] (ReqArg AssemblyFile "") ""
         ,Option []    ["help"] (NoArg Help) "Print this help message"
         ]
 
--- Arguments handling
 parse argv = case getOpt Permute flags argv of
               (args, fs, []) -> do
                 let files = if null fs then ["-"] else fs
