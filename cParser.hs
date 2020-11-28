@@ -193,9 +193,6 @@ mandWs = spanP (not . isSpace)
 semicolon :: Parser String
 semicolon = ws <* parseChar ';'
 
--- NOTE: many applies a function on its input until it fails:
--- Running runParser jsonNull "nullnullnull" would produce Right("nullnull", JsonNull), adding many:
---         runParser (many jsonNull "nullnullnull" will produce (Right "", JsonNull, JsonNull, JsonNull) 
 sepBy :: Parser a -> Parser b -> Parser [b]
 sepBy sep element = (:) <$> element <*> many (sep *> element) 
                  <|> pure []
@@ -348,7 +345,7 @@ main = do
   let ins = filterInstructionSet as 
       ass = filterAssemblyOutput as
       file = fs !! 0
-  putStrLn $ "Instruction set: "            ++ ins -- NOTE: Only x86 for now
+  putStrLn $ "Instruction set: "           ++ ins -- NOTE: Only x86 for now
   putStrLn ("[INFO] Parsing source file '" ++ show (fs !! 0) ++ "'") >>
     readFile file >>= \ source ->
        case runParser program source of
