@@ -47,7 +47,11 @@ data Input = Input
   } deriving (Show, Eq)
 
 data Declaration = Declaration VariableType Identifier 
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show Declaration where
+  show (Declaration a b) = "Declaration " ++ show a ++ " " ++ show b 
+                         ++ "           "          
 
 -- We only care about return statements for now 
 data Statement = Return
@@ -62,24 +66,42 @@ data VariableType = VariableType String
   deriving (Show, Eq)
 
 data ReturnType = ReturnType String
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show ReturnType where
+  show (ReturnType a) = "ReturnType " ++ show a ++ " "
 
 data Identifier = Identifier String
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show Identifier where
+  show (Identifier a) = show a ++ "\n"
 
 -- Function parameters
 data Params = Params [Declaration]
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show Params where
+  show (Params a) = "    Params " ++ show a ++ "\n"
 
 -- A function body will be reduced to a list of statements for the moment
 data Body = Body [Statement]
-  deriving (Show, Eq)
+  deriving Eq
+
+instance Show Body where
+  show (Body xs) = "    Body " ++ show xs
 
 data Function = Function ReturnType Identifier Params Body
-  deriving (Show, Eq)
+  deriving Eq
+ 
+instance Show Function where
+  show (Function a b c d) = " Function " ++ show a ++ show b ++ show c ++ show d
 
 data Program = Program Function
-  deriving (Show, Eq)
+  deriving Eq
+ 
+instance Show Program where
+  show (Program a) = "Program\n" ++ show a 
 
 data ParseError = ParseError Int String 
 --  deriving (Show, Eq) 
@@ -295,7 +317,7 @@ generateFunction :: Function -> String
 generateFunction (Function ret id params body) = generateFunctionHead id ++
                                                  generateBody body
 
--- TODO: Traverse the AST and generate the assembly code
+-- DOING: Traverse the AST and generate the assembly code
 generateAssembly :: Program -> String
 generateAssembly (Program f) = generateFunction f 
 
@@ -350,15 +372,14 @@ main = do
     readFile file >>= \ source ->
        case runParser program source of
         Right (source, ast) -> 
-          putStrLn ("[INFO] Parsed as the following AST: (NOTE: Pretty print it)\n" ++ show ast ++ "\n") >>
+          putStrLn ("[INFO] Parsed as the following AST:\n" ++ show ast ++ "\n") >>
           putStrLn ("[INFO] Assembly:") >>
           putStrLn asm >>
           writeFile ass asm >>
-          putStrLn ("Assembly was written to " ++ ass)
+          putStrLn ("Assembly code was written to " ++ ass)
             where 
               asm = generateAssembly ast
 
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
-
 
