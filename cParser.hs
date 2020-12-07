@@ -95,7 +95,7 @@ data Function = Function ReturnType Identifier Params Body
   deriving Eq
  
 instance Show Function where
-  show (Function a b c d) = " Function " ++ show a ++ show b ++ show c ++ show d
+  show (Function a b c d) = "  Function " ++ show a ++ show b ++ show c ++ show d
 
 data Program = Program Function
   deriving Eq
@@ -368,7 +368,7 @@ main = do
       ass = filterAssemblyOutput as
       file = fs !! 0
   putStrLn $ "Instruction set: "           ++ ins -- NOTE: Only x86 for now
-  putStrLn ("[INFO] Parsing source file '" ++ show (fs !! 0) ++ "'") >>
+  putStrLn ("[INFO] Parsing source file " ++ show (fs !! 0)) >>
     readFile file >>= \ source ->
        case runParser program source of
         Right (source, ast) -> 

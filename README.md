@@ -36,7 +36,10 @@ int main()
 ```
 returns the following AST:
 ```
-Right (Program (Function (ReturnType "int") (Identifier "main") (Params []) (Body [Statement Return (Expression 2)])))
+Program
+  Function ReturnType "int" "main"
+    Params []
+    Body [Statement Return (Expression 2)]
 ```
 
 - A program containing a **simple function** (with or without parameters) and a **return statement**.
@@ -44,12 +47,17 @@ The following function:
 ```
 int func(int i, int j)
 {
-    return 4;
+    return 7;
 }
 ```
 returns the following AST:
 ```
-Right (Program (Function (ReturnType "int") (Identifier "func") (Params [Declaration (VariableType "int") (Identifier "i"),Declaration (VariableType "int") (Identifier "j")]) (Body [Statement Return (Expression 4)])))
+Program
+  Function ReturnType "int" "func"
+    Params [Declaration VariableType "int" "i"
+           ,Declaration VariableType "int" "j"
+             ]
+    Body [Statement Return (Expression 7)]
 ```
 
 Generates proper assembly for all stage 1 valid examples!

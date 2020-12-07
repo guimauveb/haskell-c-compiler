@@ -1,4 +1,4 @@
-int main()
+int func(int i, int j)
 {
-    return 2;
+    return 7;
 }
