@@ -58,7 +58,7 @@ data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
   deriving (Show, Eq)
 
-data UnaryOperator = Operator String
+data UnaryOperator = Operator Char
   deriving (Show, Eq)
 
 data Expression = Constant Integer 
@@ -233,13 +233,12 @@ constant :: Parser Expression
 constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
   where f ds = Constant $ read ds
 
--- Char / String ?
 unaryOperator :: Parser UnaryOperator
 unaryOperator = f <$>
   (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
-  where f "-" = Operator "-"
-        f "~" = Operator "~"
-        f "!" = Operator "!"
+  where f "-" = Operator '-'
+        f "~" = Operator '~'
+        f "!" = Operator '!'
 
 unaryOperation :: Parser Expression
 unaryOperation = UnaryOperation <$> unaryOperator <*> expression
