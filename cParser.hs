@@ -61,7 +61,7 @@ data Statement = Return
 data UnaryOperator = Operator String
   deriving (Show, Eq)
 
-data Expression = Constant Integer -- Constant ?
+data Expression = Constant Integer 
                 | UnaryOperation UnaryOperator Expression
   deriving (Show, Eq)
 
