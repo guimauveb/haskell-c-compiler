@@ -75,4 +75,4 @@ To link it and generate a vaid executable we do the following:
 
 And it works!
 
-
+12/09/20 update: Parses (some) unary operations.

@@ -241,11 +241,12 @@ unaryOperator = f <$>
         f "~" = Operator "~"
         f "!" = Operator "!"
 
--- TODO - parse a unary operation
+unaryOperation :: Parser Expression
+unaryOperation = UnaryOperation <$> unaryOperator <*> expression
+
 expression :: Parser Expression
 expression = constant 
-          <|> UnaryOperation <$> unaryOperator <*> expression
-
+          <|> unaryOperation
 
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
