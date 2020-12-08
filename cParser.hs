@@ -58,11 +58,11 @@ data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
   deriving (Show, Eq)
 
-data UnaryOperator = Operator Char
+data UnaryOperator = Operator String
   deriving (Show, Eq)
 
-data Expression = Expression Integer -- Constant ?
-                | UnaryOperator Expression
+data Expression = Constant Integer -- Constant ?
+                | UnaryOperation UnaryOperator Expression
   deriving (Show, Eq)
 
 data VariableType = VariableType String
@@ -229,20 +229,23 @@ singleQuotes = parseChar '\'' *> spanP (/='\'') <* parseChar '\''
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
 
--- NOTE: Only parses an int for now
--- TODO - parse a unary operation
-expression :: Parser Expression
-expression = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
--- | f<$> (unaryOperator) (expression)
-  where f ds  = Expression $ read ds
+constant :: Parser Expression
+constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
+  where f ds = Constant $ read ds
 
 -- Char / String ?
 unaryOperator :: Parser UnaryOperator
 unaryOperator = f <$>
   (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
-  where f "-" = Operator '-'
-        f "~" = Operator '~'
-        f "!" = Operator '!'
+  where f "-" = Operator "-"
+        f "~" = Operator "~"
+        f "!" = Operator "!"
+
+-- TODO - parse a unary operation
+expression :: Parser Expression
+expression = constant 
+          <|> UnaryOperation <$> unaryOperator <*> expression
+
 
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
@@ -302,7 +305,7 @@ program = Program <$> function
 
 -- The following block of code is dedicated to assembly generation. I should put it in a separate module.
 generateExpression :: Expression -> String
-generateExpression (Expression ex) = show ex
+generateExpression (Constant ex) = show ex
 
 generateStatement :: [Statement] -> String
 generateStatement ([Statement s ex]) 
