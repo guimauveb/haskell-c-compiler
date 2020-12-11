@@ -304,16 +304,29 @@ program :: Parser Program
 program = Program <$> function
 
 -- The following block of code is dedicated to assembly generation. I should put it in a separate module.
+
+generateUnaryOperation :: UnaryOperator -> String
+generateUnaryOperation (Operator op) 
+  | (op=='-') = "neg      %eax" ++ "\n"
+  | (op=='!') = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise 
+                "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
+                "sete     %al"      ++ "\n"     -- set AL register (the lower byte of EAX) to 1 if ZF is on
+  | (op=='~') = "~ operator not implemented yet"
+  | otherwise = "Unknown unary operator."
+
+
 generateExpression :: Expression -> String
-generateExpression (Constant ex) = show ex
+generateExpression (Constant ex) = "movl     $" 
+                                 ++ show ex 
+                                 ++ ", %eax"
+                                 ++ "\n"
+generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
+
 
 generateStatement :: [Statement] -> String
 generateStatement ([Statement s ex]) 
-  | (s==Return) = "movl     $" ++ 
-                  generateExpression ex ++
-                  ", %eax" ++ 
-                  "\n" ++
-                  "ret"
+  | (s==Return) = generateExpression ex 
+                  ++ "ret"
   | otherwise   = ""
 -- Statement Statement Expression -- Mandatory semicolon
 
@@ -321,7 +334,7 @@ generateBody :: Body -> String
 generateBody (Body s) = generateStatement s
 
 generateParams :: Params -> String
-generateParams (Params [])= undefined
+generateParams (Params []) = undefined
 generateParams (Params (x:xs)) = undefined
 
 generateFunctionHead :: Identifier -> String
@@ -364,12 +377,14 @@ parse argv = case getOpt Permute flags argv of
 -- Or at least return the consumed input and the rest of the list, so we don't move the list around with already
 -- parsed values.
 filterInstructionSet :: [Flag] -> String
+filterInstructionSet [] = "No instruction set given."
 filterInstructionSet list = 
   case head [x | x@(InstructionSet _) <- list] of 
     InstructionSet i -> i 
-    empty -> "Could not match flag in the list of arguments." -- Not matched!
+    empty -> "Could not match instruction set in the list of arguments." -- Not matched!
 
 filterAssemblyOutput :: [Flag] -> String
+filterAssemblyOutput [] = "No assembly file path given."
 filterAssemblyOutput list = 
   case head [x | x@(AssemblyFile _) <- list] of 
     AssemblyFile a -> a
@@ -392,7 +407,7 @@ main = do
           putStrLn ("[INFO] Assembly:") >>
           putStrLn asm >>
           writeFile ass asm >>
-          putStrLn ("Assembly code was written to " ++ ass)
+          putStrLn ("Assembly code was written to: " ++ ass)
             where 
               asm = generateAssembly ast
 
