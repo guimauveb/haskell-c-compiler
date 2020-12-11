@@ -4,25 +4,66 @@ From Nora Sandler's article [Write a C Compiler](https://norasandler.com/2017/11
 
 With the help of Tsoding great video [JSON Parser 100% From Scratch in Haskell](https://www.youtube.com/watch?v=N9RUqGYuGfw&t=957s)
 
+### Details
+My goal is to learn more about functionnal programming, Haskell being king in this realm, and more about compilers, C and assembly.  
+
 **Part 1: Done!**
+**Part 2: Done!**
+
+### Usage
+
+- Compile the program using GHC:
+```
+    $ ghc cParser.hs -o cParser
+```
+
+- Run the program with the following command:
+```
+    $ ./cParser <some_very_basic_c_file> -i <instruction_set> -o <assembly_file>
+```
+**NOTE:** The instruction set flag is not implemented yet. It only generates x86 assembly for now.
+
+- To link the generated assembly file and create a vaid executable, use gcc or clang:
+```
+    $ gcc assembly.s -o out 
+```
+
+Passes all stage 1 and stage 2 tests:
 
 ```
 Stage 1 tests:
     Valid:
-        multi_digit.c       PASS
-        newlines.c          PASS
-        no_newlines.c       PASS
-        return_0.c          PASS
-        return_2.c          PASS
-        spaces.c            PASS
+        multi_digit.c           PASS
+        newlines.c              PASS
+        no_newlines.c           PASS
+        return_0.c              PASS
+        return_2.c              PASS
+        spaces.c                PASS
 
     Invalid:
-        missing_paren.c     PASS 
-        missing_retval.c    PASS
-        no_brace.c          PASS
-        no_semicolon.c      PASS
-        no_space.c          PASS 
-        wrong_case.c        PASS
+        missing_paren.c         PASS 
+        missing_retval.c        PASS
+        no_brace.c              PASS
+        no_semicolon.c          PASS
+        no_space.c              PASS 
+        wrong_case.c            PASS
+
+Stage 2 tests:
+    Valid:
+        bitwise.c               PASS
+        bitiwse_zero.c          PASS
+        neg.c                   PASS
+        nested_ops.c            PASS
+        nested_ops_2.c          PASS
+        not_five.c              PASS
+        not_zero.c              PASS
+
+    Invalid:
+        missing_const.c         PASS
+        missing_semicolon.c     PASS
+        nested_missing_const.c  PASS
+        wrong_order.c           PASS
+
 ```
 
 Generates a correct AST for the following:
@@ -60,19 +101,39 @@ Program
     Body [Statement Return (Expression 7)]
 ```
 
-Generates proper assembly for all stage 1 valid examples!
 
-Usage : 
+12/11/20 update: Parses the following unary operations and generates proper assembly for the following unary operators:
+- - Negation
+- ~ Bitwise complement
+- ! Logical negation
+
+- The following program:
+
 ```
-    $ ghc cParser.hs -o cParser
-    $ ./cParser some_very_basic_c_file.c assembly.s
+int main() {
+    return !-3;
+}
 ```
 
-To link it and generate a vaid executable we do the following:
+returns the following AST:
 ```
-    $ gcc assembly.s -o out
+Program
+  Function ReturnType "int" "main"
+    Params []
+    Body [Statement Return (UnaryOperation (Operator '!') (UnaryOperation (Operator '-') (Constant 3)))]
 ```
 
-And it works!
+and the following assembly:
 
-12/09/20 update: Parses (some) unary operations.
+```
+.globl _main
+_main:
+movl     $3, %eax
+neg      %eax
+cmpl     $0, %eax
+movl     $0, %eax
+sete     %al
+ret
+```
+
+

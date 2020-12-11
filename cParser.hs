@@ -377,7 +377,7 @@ parse argv = case getOpt Permute flags argv of
 -- Or at least return the consumed input and the rest of the list, so we don't move the list around with already
 -- parsed values.
 filterInstructionSet :: [Flag] -> String
-filterInstructionSet [] = "No instruction set given."
+filterInstructionSet [] = "No instruction set was given. Defaults to x86."
 filterInstructionSet list = 
   case head [x | x@(InstructionSet _) <- list] of 
     InstructionSet i -> i 
@@ -398,29 +398,21 @@ main = do
   let ins = filterInstructionSet as 
       ass = filterAssemblyOutput as
       file = fs !! 0
-  putStrLn $ "Instruction set: "          ++ ins -- NOTE: Only x86 for now
   putStrLn ("[INFO] Parsing source file " ++ show (fs !! 0)) >>
     readFile file >>= \ source ->
        case runParser program source of
         Right (source, ast) -> 
           putStrLn ("[INFO] Parsed as the following AST:\n" ++ show ast ++ "\n") >>
-          putStrLn ("[INFO] Assembly:") >>
+          putStrLn ("[INFO] Instruction set: " ++ ins) >> -- NOTE: Only x86 for now
+          putStrLn ("[INFO] Assembly:\n") >>
           putStrLn asm >>
           writeFile ass asm >>
-          putStrLn ("Assembly code was written to: " ++ ass)
+          putStrLn ("\n[INFO] Assembly code was written to: " ++ ass)
             where 
               asm = generateAssembly ast
 
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
-
-{-
-  Part 2:
-    Negation -
-    Bitwise complement ~
-    Logical negation !
--}
-
 
 
 
