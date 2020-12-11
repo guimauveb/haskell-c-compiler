@@ -7,8 +7,8 @@ With the help of Tsoding great video [JSON Parser 100% From Scratch in Haskell](
 ### Details
 My goal is to learn more about functionnal programming, Haskell being king in this realm, and more about compilers, C and assembly.  
 
-**Part 1: Done!**
-**Part 2: Done!**
+- **Part 1: Done!**
+- **Part 2: Done!**
 
 ### Usage
 
@@ -102,10 +102,12 @@ Program
 ```
 
 
-12/11/20 update: Parses the following unary operations and generates proper assembly for the following unary operators:
-- - Negation
-- ~ Bitwise complement
-- ! Logical negation
+**12/11/20 update: Parses the following unary operations and generates proper assembly for the following unary operators:**
+```
+- Negation
+~ Bitwise complement
+! Logical negation
+```
 
 - The following program:
 
@@ -136,4 +138,4 @@ sete     %al
 ret
 ```
 
-
+Working on part 3 now.
