@@ -311,7 +311,7 @@ generateUnaryOperation (Operator op)
   | (op=='!') = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise 
                 "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
                 "sete     %al"      ++ "\n"     -- set AL register (the lower byte of EAX) to 1 if ZF is on
-  | (op=='~') = "~ operator not implemented yet"
+  | (op=='~') = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
 
