@@ -58,11 +58,15 @@ data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
   deriving (Show, Eq)
 
-data UnaryOperator = Operator Char
+data UnaryOperator = UnOperator Char
+  deriving (Show, Eq)
+
+data BinaryOperator = BinOperator Char
   deriving (Show, Eq)
 
 data Expression = Constant Integer 
                 | UnaryOperation UnaryOperator Expression
+                | BinaryOperation Expression BinaryOperator Expression
   deriving (Show, Eq)
 
 data VariableType = VariableType String
@@ -159,7 +163,6 @@ instance Show ParseError where show = showError
 -- TODO - Implement ParseError using catchError from Control.Monad
 -- trapError action = catchError action (return . show)
 
--- NOTE: Using where notation instead of lambda notation
 parseChar :: Char -> Parser Char
 parseChar x = Parser f
   where 
@@ -236,16 +239,29 @@ constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
 unaryOperator :: Parser UnaryOperator
 unaryOperator = f <$>
   (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
-  where f "-" = Operator '-'
-        f "~" = Operator '~'
-        f "!" = Operator '!'
+  where f "-" = UnOperator '-'
+        f "~" = UnOperator '~'
+        f "!" = UnOperator '!'
 
 unaryOperation :: Parser Expression
 unaryOperation = UnaryOperation <$> unaryOperator <*> expression
 
+binaryOperator :: Parser BinaryOperator
+binaryOperator = f <$>
+  (ws *> parseString "-" <* ws <|> ws *> parseString "+" <* ws <|> 
+   ws *> parseString "*" <* ws <|> ws *> parseString "/" <* ws)
+  where f "-" = BinOperator '-'
+        f "+" = BinOperator '+'
+        f "*" = BinOperator '*'
+        f "/" = BinOperator '/'
+
+binaryOperation :: Parser Expression
+binaryOperation = BinaryOperation <$> expression <*> binaryOperator <*> expression
+
 expression :: Parser Expression
 expression = constant 
           <|> unaryOperation
+          <|> binaryOperation
 
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
@@ -304,9 +320,8 @@ program :: Parser Program
 program = Program <$> function
 
 -- The following block of code is dedicated to assembly generation. I should put it in a separate module.
-
 generateUnaryOperation :: UnaryOperator -> String
-generateUnaryOperation (Operator op) 
+generateUnaryOperation (UnOperator op) 
   | (op=='-') = "neg      %eax" ++ "\n"
   | (op=='!') = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise 
                 "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
@@ -328,7 +343,6 @@ generateStatement ([Statement s ex])
   | (s==Return) = generateExpression ex 
                   ++ "ret"
   | otherwise   = ""
--- Statement Statement Expression -- Mandatory semicolon
 
 generateBody :: Body -> String
 generateBody (Body s) = generateStatement s
@@ -413,7 +427,5 @@ main = do
 
         Left e -> 
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
-
-
 
 
