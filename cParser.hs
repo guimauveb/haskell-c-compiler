@@ -64,10 +64,13 @@ data UnaryOperator = UnOperator Char
 data BinaryOperator = BinOperator Char
   deriving (Show, Eq)
 
-data Expression = Constant Integer 
-                | UnaryOperation UnaryOperator Expression
-                | BinaryOperation Expression BinaryOperator Expression
+data Expression = BinaryOperation Expression BinaryOperator Expression
   deriving (Show, Eq)
+
+-- TODO - Create a ParenExpression data type ?
+data Factor = Expression
+            | UnaryOperation UnaryOperator Factor
+            | Constant Integer
 
 data VariableType = VariableType String
   deriving (Show, Eq)
@@ -257,6 +260,10 @@ binaryOperator = f <$>
 
 binaryOperation :: Parser Expression
 binaryOperation = BinaryOperation <$> expression <*> binaryOperator <*> expression
+
+-- TODO -> '(' Expression ')' | UnaryOperation | Constant Integer
+factor :: Parser Factor
+factor = undefined
 
 expression :: Parser Expression
 expression = constant 
