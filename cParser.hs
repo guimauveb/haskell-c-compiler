@@ -68,9 +68,12 @@ data BinaryOperator = MultiplicationOperator Char
                     deriving (Show, Eq)
 
 -- TODO - Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
+-- Apparently not... Use many ?
 -- TODO - Split binary operators into two categories ? (+,- and *,/)
 data Expression = AddOperation Term BinaryOperator Term
                 | SubtractOperation Term BinaryOperator Term
+                -- TODO - temporary
+                | TermOp Term
                 deriving (Show, Eq)
 
 -- TODO - Split binary operators into two categories ? (+,- and *,/)
@@ -267,7 +270,7 @@ unaryOperation = UnaryOperation <$> unaryOperator <*> factor
 addOperator :: Parser BinaryOperator
 addOperator = f <$>
   (ws *> parseString "+" <* ws)
-    where f "-" = AdditionOperator '-'
+    where f "+" = AdditionOperator '+'
 
 subtractOperator :: Parser BinaryOperator
 subtractOperator = f <$>
@@ -277,25 +280,23 @@ subtractOperator = f <$>
 multiplicationOperator :: Parser BinaryOperator
 multiplicationOperator = f <$>
   (ws *> parseString "*" <* ws)
-    where f "-" = MultiplicationOperator '-'
+    where f "*" = MultiplicationOperator '*'
 
 divisionOperator :: Parser BinaryOperator
 divisionOperator = f <$>
   (ws *> parseString "/" <* ws)
-    where f "-" = DivisionOperator '/'
+    where f "/" = DivisionOperator '/'
 
 
 expression :: Parser Expression
 expression = AddOperation <$> term <*> addOperator <*> term
           <|> SubtractOperation <$> term <*> subtractOperator <*> term
-
--- data Term = MultiplyOperation Factor BinaryOperator Factor
---           | DivideOperation Factor BinaryOperator Factor
---           | FactorTerm Factor
+          <|> TermOp <$> term
 
 term :: Parser Term
 term = MultiplyOperation <$> factor <*> multiplicationOperator <*> factor
     <|> DivideOperation <$> factor <*> divisionOperator <*> factor
+    <|> FactorTerm <$> factor
 
 -- A factor is an expression a unary operator can be applied to.
 -- '(' <exp> ')' <|> <unary_operation> > <|> constant
@@ -312,7 +313,6 @@ returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There mus
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
 statement :: Parser Statement
 statement = Statement <$> returnStatement  <*> expression <* semicolon
-      -- <|>
 
 -- TODO - NOTE: Use a data structure to represent data types (int, char etc) instead of having the same code
 -- for both returnType and variableType
