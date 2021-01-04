@@ -9,6 +9,7 @@ My goal is to learn more about functionnal programming, Haskell being king in th
 
 - **Part 1: Done!**
 - **Part 2: Done!**
+- **Part 3: Doing...**
 
 ### Usage
 
