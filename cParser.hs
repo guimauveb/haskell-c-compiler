@@ -47,7 +47,7 @@ data Input = Input
   } deriving (Show, Eq)
 
 data Declaration = Declaration VariableType Identifier 
-  deriving Eq
+                 deriving Eq
 
 instance Show Declaration where
   show (Declaration a b) = "Declaration " ++ show a ++ " " ++ show b 
@@ -56,59 +56,67 @@ instance Show Declaration where
 -- We only care about return statements for now 
 data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
-  deriving (Show, Eq)
+               deriving (Show, Eq)
 
 data UnaryOperator = UnOperator Char
-  deriving (Show, Eq)
+                   deriving (Show, Eq)
 
 data BinaryOperator = BinOperator Char
-  deriving (Show, Eq)
+                    deriving (Show, Eq)
 
-data Expression = BinaryOperation Expression BinaryOperator Expression
-  deriving (Show, Eq)
+-- TODO - Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
+-- TODO - Split binary operators into two categories ? (+,- and *,/)
+data Expression = AddOrSubtractBinaryOperation Term BinaryOperator Term
+                deriving (Show, Eq)
 
--- TODO - Create a ParenExpression data type ?
-data Factor = Expression
+-- A factor is an expression a unary operator can be applied to
+data Factor = WrappedExpression Expression -- WrappedExpression is an expression wrapped in parentheses
             | UnaryOperation UnaryOperator Factor
             | Constant Integer
+            deriving(Show, Eq)
+
+-- TODO - Split binary operators into two categories ? (+,- and *,/)
+data Term = MultiplyOrDivideOperation Factor BinaryOperator Factor
+          | FactorTerm Factor
+          deriving(Show, Eq)
 
 data VariableType = VariableType String
-  deriving (Show, Eq)
+                  deriving (Show, Eq)
 
 data ReturnType = ReturnType String
-  deriving Eq
+                deriving Eq
 
 instance Show ReturnType where
   show (ReturnType a) = "ReturnType " ++ show a ++ " "
 
 data Identifier = Identifier String
-  deriving Eq
+                deriving Eq
 
 instance Show Identifier where
   show (Identifier a) = show a ++ "\n"
 
 -- Function parameters
 data Params = Params [Declaration]
-  deriving Eq
+            deriving Eq
 
 instance Show Params where
   show (Params a) = "    Params " ++ show a ++ "\n"
 
 -- A function body will be reduced to a list of statements for the moment
 data Body = Body [Statement]
-  deriving Eq
+          deriving Eq
 
 instance Show Body where
   show (Body xs) = "    Body " ++ show xs
 
 data Function = Function ReturnType Identifier Params Body
-  deriving Eq
+              deriving Eq
  
 instance Show Function where
   show (Function a b c d) = "  Function " ++ show a ++ show b ++ show c ++ show d
 
 data Program = Program Function
-  deriving Eq
+             deriving Eq
  
 instance Show Program where
   show (Program a) = "Program\n" ++ show a 
@@ -235,7 +243,8 @@ singleQuotes = parseChar '\'' *> spanP (/='\'') <* parseChar '\''
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
 
-constant :: Parser Expression
+-- TODO - constant is now a Factor
+constant :: Parser Factor
 constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
   where f ds = Constant $ read ds
 
@@ -246,8 +255,9 @@ unaryOperator = f <$>
         f "~" = UnOperator '~'
         f "!" = UnOperator '!'
 
-unaryOperation :: Parser Expression
-unaryOperation = UnaryOperation <$> unaryOperator <*> expression
+-- TODO - unaryOperation is now a factor
+unaryOperation :: Parser Factor
+unaryOperation = UnaryOperation <$> unaryOperator <*> factor
 
 binaryOperator :: Parser BinaryOperator
 binaryOperator = f <$>
@@ -263,8 +273,9 @@ binaryOperation = BinaryOperation <$> expression <*> binaryOperator <*> expressi
 
 -- TODO -> '(' Expression ')' | UnaryOperation | Constant Integer
 factor :: Parser Factor
-factor = undefined
-
+factor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
+                           expression
+                           <* ws <* parseChar ')' <* ws)
 expression :: Parser Expression
 expression = constant 
           <|> unaryOperation
@@ -338,10 +349,12 @@ generateUnaryOperation (UnOperator op)
 
 
 generateExpression :: Expression -> String
+-- TODO - constant is now a Factor
 generateExpression (Constant ex) = "movl     $" 
                                  ++ show ex 
                                  ++ ", %eax"
                                  ++ "\n"
+-- TODO - unaryOperation is now a Factor
 generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
 
 
