@@ -61,24 +61,29 @@ data Statement = Return
 data UnaryOperator = UnOperator Char
                    deriving (Show, Eq)
 
-data BinaryOperator = BinOperator Char
+data BinaryOperator = MultiplicationOperator Char
+                    | DivisionOperator Char
+                    | AdditionOperator Char
+                    | SubtractOperator Char
                     deriving (Show, Eq)
 
 -- TODO - Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
 -- TODO - Split binary operators into two categories ? (+,- and *,/)
-data Expression = AddOrSubtractBinaryOperation Term BinaryOperator Term
+data Expression = AddOperation Term BinaryOperator Term
+                | SubtractOperation Term BinaryOperator Term
                 deriving (Show, Eq)
+
+-- TODO - Split binary operators into two categories ? (+,- and *,/)
+data Term = MultiplyOperation Factor BinaryOperator Factor
+          | DivideOperation Factor BinaryOperator Factor
+          | FactorTerm Factor
+          deriving(Show, Eq)
 
 -- A factor is an expression a unary operator can be applied to
 data Factor = WrappedExpression Expression -- WrappedExpression is an expression wrapped in parentheses
             | UnaryOperation UnaryOperator Factor
             | Constant Integer
             deriving(Show, Eq)
-
--- TODO - Split binary operators into two categories ? (+,- and *,/)
-data Term = MultiplyOrDivideOperation Factor BinaryOperator Factor
-          | FactorTerm Factor
-          deriving(Show, Eq)
 
 data VariableType = VariableType String
                   deriving (Show, Eq)
@@ -248,6 +253,7 @@ constant :: Parser Factor
 constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
   where f ds = Constant $ read ds
 
+-- TODO - Split unary operators ?
 unaryOperator :: Parser UnaryOperator
 unaryOperator = f <$>
   (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
@@ -255,31 +261,50 @@ unaryOperator = f <$>
         f "~" = UnOperator '~'
         f "!" = UnOperator '!'
 
--- TODO - unaryOperation is now a factor
 unaryOperation :: Parser Factor
 unaryOperation = UnaryOperation <$> unaryOperator <*> factor
 
-binaryOperator :: Parser BinaryOperator
-binaryOperator = f <$>
-  (ws *> parseString "-" <* ws <|> ws *> parseString "+" <* ws <|> 
-   ws *> parseString "*" <* ws <|> ws *> parseString "/" <* ws)
-  where f "-" = BinOperator '-'
-        f "+" = BinOperator '+'
-        f "*" = BinOperator '*'
-        f "/" = BinOperator '/'
+addOperator :: Parser BinaryOperator
+addOperator = f <$>
+  (ws *> parseString "+" <* ws)
+    where f "-" = AdditionOperator '-'
 
-binaryOperation :: Parser Expression
-binaryOperation = BinaryOperation <$> expression <*> binaryOperator <*> expression
+subtractOperator :: Parser BinaryOperator
+subtractOperator = f <$>
+  (ws *> parseString "-" <* ws)
+     where f "-" = SubtractOperator '-'
+          
+multiplicationOperator :: Parser BinaryOperator
+multiplicationOperator = f <$>
+  (ws *> parseString "*" <* ws)
+    where f "-" = MultiplicationOperator '-'
 
--- TODO -> '(' Expression ')' | UnaryOperation | Constant Integer
+divisionOperator :: Parser BinaryOperator
+divisionOperator = f <$>
+  (ws *> parseString "/" <* ws)
+    where f "-" = DivisionOperator '/'
+
+
+expression :: Parser Expression
+expression = AddOperation <$> term <*> addOperator <*> term
+          <|> SubtractOperation <$> term <*> subtractOperator <*> term
+
+-- data Term = MultiplyOperation Factor BinaryOperator Factor
+--           | DivideOperation Factor BinaryOperator Factor
+--           | FactorTerm Factor
+
+term :: Parser Term
+term = MultiplyOperation <$> factor <*> multiplicationOperator <*> factor
+    <|> DivideOperation <$> factor <*> divisionOperator <*> factor
+
+-- A factor is an expression a unary operator can be applied to.
+-- '(' <exp> ')' <|> <unary_operation> > <|> constant
 factor :: Parser Factor
 factor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
                            expression
                            <* ws <* parseChar ')' <* ws)
-expression :: Parser Expression
-expression = constant 
-          <|> unaryOperation
-          <|> binaryOperation
+      <|> unaryOperation 
+      <|> constant 
 
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
@@ -337,6 +362,7 @@ function = Function <$> returnType <*> identifier <*> params <*> body
 program :: Parser Program
 program = Program <$> function
 
+-- TODO - Split unary operators ?
 -- The following block of code is dedicated to assembly generation. I should put it in a separate module.
 generateUnaryOperation :: UnaryOperator -> String
 generateUnaryOperation (UnOperator op) 
@@ -347,16 +373,21 @@ generateUnaryOperation (UnOperator op)
   | (op=='~') = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
+generateTerm :: Term -> String
+generateTerm = undefined
+
+generateFactor :: Factor -> String
+generateFactor = undefined
 
 generateExpression :: Expression -> String
 -- TODO - constant is now a Factor
-generateExpression (Constant ex) = "movl     $" 
-                                 ++ show ex 
-                                 ++ ", %eax"
-                                 ++ "\n"
+generateExpression = undefined
+--generateExpression (Constant ex) = "movl     $" 
+--                                 ++ show ex 
+--                                 ++ ", %eax"
+--                                 ++ "\n"
 -- TODO - unaryOperation is now a Factor
-generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
-
+-- generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
 
 generateStatement :: [Statement] -> String
 generateStatement ([Statement s ex]) 
