@@ -67,7 +67,6 @@ Stage 2 tests:
 
 
 Stage 3 tests:
-
     Valid:
         add.c                   PASS
         associativity.c         FAIL
