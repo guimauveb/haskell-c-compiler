@@ -67,19 +67,19 @@ data BinaryOperator = MultiplicationOperator Char
                     | SubtractOperator Char
                     deriving (Show, Eq)
 
--- TODO - Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
--- Apparently not... 
--- Use a many-like combinator (https://stackoverflow.com/questions/49751139/how-to-combine-parsers-up-to-n-times-in-haskell)
--- ?
-data Expression = AddOperation Term BinaryOperator Term
-                | SubtractOperation Term BinaryOperator Term
-                -- TODO - temporary
-                | TermOp Term
+-- Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
+-- YES!
+-- Defining an expression by being a term plus or minus another term, plus or minus another term.... 
+-- is actually super easy. We only have to define an expression recursively as itself being a term,
+-- this way we can handle an undefined number of plus/minus other terms. 
+data Expression = AddOperation Term BinaryOperator Expression
+                | SubtractOperation Term BinaryOperator Expression
+                | TermOperation Term
                 deriving (Show, Eq)
 
 -- TODO - Split binary operators into two categories ? (+,- and *,/)
-data Term = MultiplyOperation Factor BinaryOperator Factor
-          | DivideOperation Factor BinaryOperator Factor
+data Term = MultiplyOperation Factor BinaryOperator Term
+          | DivideOperation Factor BinaryOperator Term
           | FactorTerm Factor
           deriving(Show, Eq)
 
@@ -292,15 +292,16 @@ divisionOperator = f <$>
 -- TODO - Needs to support repetition (term possibly minus or plus a term, etc)
 -- use a many-like combinator with an upper limit ? (INT_MAX)
 expression :: Parser Expression
-expression = AddOperation <$> term <*> addOperator <*> term
-          <|> SubtractOperation <$> term <*> subtractOperator <*> term
-          <|> TermOp <$> term
+expression = AddOperation <$> term <*> addOperator <*> expression
+          --  TODO - Incorrect! Handle left associativity for subtractions
+          <|> SubtractOperation <$> term <*> subtractOperator <*> expression
+          <|> TermOperation <$> term
 
 -- TODO - Needs to support repetition (factor possibly minus or plus a factor, etc)
 -- use a many-like combinator with an upper limit ? (INT_MAX)
 term :: Parser Term
-term = MultiplyOperation <$> factor <*> multiplicationOperator <*> factor
-    <|> DivideOperation <$> factor <*> divisionOperator <*> factor
+term = MultiplyOperation <$> factor <*> multiplicationOperator <*> term
+    <|> DivideOperation <$> factor <*> divisionOperator <*> term
     <|> FactorTerm <$> factor
 
 -- A factor is an expression a unary operator can be applied to.
