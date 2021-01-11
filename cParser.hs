@@ -68,8 +68,9 @@ data BinaryOperator = MultiplicationOperator Char
                     deriving (Show, Eq)
 
 -- TODO - Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
--- Apparently not... Use many ?
--- TODO - Split binary operators into two categories ? (+,- and *,/)
+-- Apparently not... 
+-- Use a many-like combinator (https://stackoverflow.com/questions/49751139/how-to-combine-parsers-up-to-n-times-in-haskell)
+-- ?
 data Expression = AddOperation Term BinaryOperator Term
                 | SubtractOperation Term BinaryOperator Term
                 -- TODO - temporary
@@ -288,18 +289,21 @@ divisionOperator = f <$>
     where f "/" = DivisionOperator '/'
 
 
+-- TODO - Needs to support repetition (term possibly minus or plus a term, etc)
+-- use a many-like combinator with an upper limit ? (INT_MAX)
 expression :: Parser Expression
 expression = AddOperation <$> term <*> addOperator <*> term
           <|> SubtractOperation <$> term <*> subtractOperator <*> term
           <|> TermOp <$> term
 
+-- TODO - Needs to support repetition (factor possibly minus or plus a factor, etc)
+-- use a many-like combinator with an upper limit ? (INT_MAX)
 term :: Parser Term
 term = MultiplyOperation <$> factor <*> multiplicationOperator <*> factor
     <|> DivideOperation <$> factor <*> divisionOperator <*> factor
     <|> FactorTerm <$> factor
 
 -- A factor is an expression a unary operator can be applied to.
--- '(' <exp> ')' <|> <unary_operation> > <|> constant
 factor :: Parser Factor
 factor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
                            expression

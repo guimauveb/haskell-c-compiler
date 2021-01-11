@@ -9,7 +9,7 @@ My goal is to learn more about functionnal programming, Haskell being king in th
 
 - **Part 1: Done!**
 - **Part 2: Done!**
-- **Part 3: Doing...**
+- **Part 3: Almost done. Working on associativity and how to handle an undefined number of binary operations.**
 
 ### Usage
 
@@ -65,6 +65,28 @@ Stage 2 tests:
         nested_missing_const.c  PASS
         wrong_order.c           PASS
 
+
+Stage 3 tests:
+
+    Valid:
+        add.c                   PASS
+        associativity.c         FAIL
+        associativity_2.c       FAIL
+        div.c                   PASS
+        div_neg.c               PASS
+        mult.c                  PASS
+        parens.c                PASS
+        precedence.c            PASS
+        sub.c                   PASS
+        sub_neg.c               PASS
+        unop_add.c              PASS
+        unop_parens.cs          PASS
+        
+    Invalid:
+        malformed_paren.c       PASS
+        missing_first_op.c      PASS
+        missing_second_op.c     PASS
+        no_semicolon.c          PASS
 ```
 
 Generates a correct AST for the following:
