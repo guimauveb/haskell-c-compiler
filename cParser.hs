@@ -1,39 +1,39 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-{- C compiler implementation in Haskell 
+{- C compiler implementation in Haskell
 
-\\\ \\\ 
- \\\ \\\ 
-  \\\ \\\  \\\\\\\\ 
+\\\ \\\
+ \\\ \\\
+  \\\ \\\  \\\\\\\\
   /// //\\   Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ
- /// ///\\\ \\\\\\\\ 
-/// ///  \\\ 
+ /// ///\\\ \\\\\\\\
+/// ///  \\\
        mov
        eax
         7
 
 TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
-an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from 
+an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from
 parseString but from parseChar trying to parse the character that follows "return", even though the error occured
-in parseString! 
+in parseString!
 
 -}
 
 module Main where
 
-import Control.Monad
-import Control.Applicative
+import           Control.Applicative
+import           Control.Monad
 
-import Data.Char
-import Data.List
-import Data.Maybe
+import           Data.Char
+import           Data.List
+import           Data.Maybe
 
-import System.Console.GetOpt
-import System.Environment
-import System.Exit
-import System.IO
+import           System.Console.GetOpt
+import           System.Environment
+import           System.Exit
+import           System.IO
 
-import Text.Printf
+import           Text.Printf
 
 data Flag = Blanks
           | InstructionSet String
@@ -41,19 +41,19 @@ data Flag = Blanks
           | Help
           deriving (Eq,Show)
 
-data Input = Input 
+data Input = Input
   { location :: Int
   , inputStr :: String
   } deriving (Show, Eq)
 
-data Declaration = Declaration VariableType Identifier 
+data Declaration = Declaration VariableType Identifier
                  deriving Eq
 
 instance Show Declaration where
-  show (Declaration a b) = "Declaration " ++ show a ++ " " ++ show b 
-                         ++ "           "          
+  show (Declaration a b) = "Declaration " ++ show a ++ " " ++ show b
+                         ++ "           "
 
--- We only care about return statements for now 
+-- We only care about return statements for now
 data Statement = Return
                | Statement Statement Expression -- Mandatory semicolon
                deriving (Show, Eq)
@@ -68,12 +68,12 @@ data BinaryOperator = MultiplicationOperator Char
                     deriving (Show, Eq)
 
 -- Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
--- YES!
--- Defining an expression by being a term plus or minus another term, plus or minus another term.... 
+-- Yes for additions, not for subtractions.
+-- Defining an expression by being a term plus or minus another term, plus or minus another term....
 -- is actually super easy. We only have to define an expression recursively as itself being a term,
--- this way we can handle an undefined number of plus/minus other terms. 
+-- this way we can handle an undefined number of plus/minus other terms.
 data Expression = AddOperation Term BinaryOperator Expression
-                | SubtractOperation Term BinaryOperator Expression
+                | SubtractOperation Term BinaryOperator Term
                 | TermOperation Term
                 deriving (Show, Eq)
 
@@ -120,22 +120,23 @@ instance Show Body where
 
 data Function = Function ReturnType Identifier Params Body
               deriving Eq
- 
+
 instance Show Function where
-  show (Function a b c d) = "  Function " ++ show a ++ show b ++ show c ++ show d
+  show (Function a b c d) = "  Function " ++
+    show a ++ show b ++ show c ++ show d
 
 data Program = Program Function
              deriving Eq
- 
-instance Show Program where
-  show (Program a) = "Program\n" ++ show a 
 
-data ParseError = ParseError Int String 
---  deriving (Show, Eq) 
+instance Show Program where
+  show (Program a) = "Program\n" ++ show a
+
+data ParseError = ParseError Int String
+--  deriving (Show, Eq)
 
 -- Pun intended
 haskii = ["",
-         "\\\\\\ \\\\\\ ", 
+         "\\\\\\ \\\\\\ ",
          " \\\\\\ \\\\\\ ",
          "  \\\\\\ \\\\\\  \\\\\\\\\\\\\\\\ ",
          "  /// //\\\\   Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ.Ɔ",
@@ -153,18 +154,18 @@ instance Alternative (Either ParseError) where
     Left _ <|> n = n
     m      <|> _ = m
 
-newtype Parser a = Parser 
+newtype Parser a = Parser
   { runParser :: String -> Either ParseError (String, a) }
 
 instance Functor Parser where
   fmap f (Parser p) =
-    Parser $ \input -> do 
+    Parser $ \input -> do
       (input', x) <- p input
       Right (input', f x)
 
 instance Applicative Parser where
   pure x = Parser $ \input -> Right (input, x)
-  (Parser p1) <*> (Parser p2) = 
+  (Parser p1) <*> (Parser p2) =
     Parser $ \input -> do
     (input', f) <- p1 input
     (input'', a) <- p2 input'
@@ -172,7 +173,7 @@ instance Applicative Parser where
 
 instance Alternative Parser where
   empty = Parser $ \_ -> Left $ ParseError 0 "empty"
-  (Parser p1) <|> (Parser p2) = 
+  (Parser p1) <|> (Parser p2) =
     Parser $ \input -> p1 input <|> p2 input
 
 -- DOING: Error checking
@@ -185,11 +186,11 @@ instance Show ParseError where show = showError
 
 parseChar :: Char -> Parser Char
 parseChar x = Parser f
-  where 
+  where
     f (y:ys)
         | y == x    = Right (ys, x)
-        | otherwise = Left $ 
-                      ParseError 
+        | otherwise = Left $
+                      ParseError
                       0 $ " Expected '" ++ [x] ++ "', but found '" ++ [y] ++ "'"
     f [] = Left $ ParseError 0 " Empty string."
 
@@ -197,17 +198,17 @@ parseChar x = Parser f
 -- But we actually want a Parser of lists
 -- [Parser Char] -> Parser [Char]
 parseString :: String -> Parser String
-parseString str = 
-  Parser $ \input -> 
-    case runParser (traverse parseChar str) input of 
+parseString str =
+  Parser $ \input ->
+    case runParser (traverse parseChar str) input of
       Left _ ->
-        Left $ 
+        Left $
         ParseError
           0 $ " Expected \"" ++ str ++ "\", but found \"" ++ input ++ "\""
       result -> result
 
 spanP :: (Char -> Bool) -> Parser String
-spanP f = Parser $ \input -> 
+spanP f = Parser $ \input ->
   let (token, rest) = span f input
     in Right (rest, token)
 
@@ -222,14 +223,14 @@ notNull (Parser p) =
 int_max = 2147483647
 
 isIntMax :: Parser String -> Parser String
-isIntMax (Parser p) = 
+isIntMax (Parser p) =
   Parser $ \input -> do
     (input', xs) <- p input
-    if read xs > int_max 
+    if read xs > int_max
        then Left $ ParseError 0 " Integer must be <= INT_MAX."
     else Right (input', xs)
 
--- NOTE: discard whitespace 
+-- NOTE: discard whitespace
 -- Returns True for any Unicode space character, and the control characters \t, \n, \r, \f, \v.
 ws :: Parser String
 ws = spanP isSpace
@@ -242,7 +243,7 @@ semicolon :: Parser String
 semicolon = ws <* parseChar ';'
 
 sepBy :: Parser a -> Parser b -> Parser [b]
-sepBy sep element = (:) <$> element <*> many (sep *> element) 
+sepBy sep element = (:) <$> element <*> many (sep *> element)
                  <|> pure []
 
 -- NOTE: Strings can be wrapped either into single or double quotes. No escaping yet
@@ -254,7 +255,7 @@ stringLiteral = singleQuotes <|> doubleQuotes
 
 -- TODO - constant is now a Factor
 constant :: Parser Factor
-constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws) 
+constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
   where f ds = Constant $ read ds
 
 -- TODO - Split unary operators ?
@@ -277,7 +278,7 @@ subtractOperator :: Parser BinaryOperator
 subtractOperator = f <$>
   (ws *> parseString "-" <* ws)
      where f "-" = SubtractOperator '-'
-          
+
 multiplicationOperator :: Parser BinaryOperator
 multiplicationOperator = f <$>
   (ws *> parseString "*" <* ws)
@@ -288,14 +289,36 @@ divisionOperator = f <$>
   (ws *> parseString "/" <* ws)
     where f "/" = DivisionOperator '/'
 
+binaryOperator :: Parser BinaryOperator
+binaryOperator = addOperator
+              <|> subtractOperator
+              <|> multiplicationOperator
+              <|> divisionOperator
 
 -- TODO - Needs to support repetition (term possibly minus or plus a term, etc)
 -- use a many-like combinator with an upper limit ? (INT_MAX)
 expression :: Parser Expression
 expression = AddOperation <$> term <*> addOperator <*> expression
           --  TODO - Incorrect! Handle left associativity for subtractions
-          <|> SubtractOperation <$> term <*> subtractOperator <*> expression
+          --  Doesn't sound easy but still doable.
+          <|> SubtractOperation <$> term <*> subtractOperator <*> term
           <|> TermOperation <$> term
+
+-- TODO - Check the following function and adapt it to my current program
+-- Seems like Expression, Term, Factor etc all have to be of the same type.
+{-
+ parseExp :: Parser Exp
+ parseExp = do
+ t1 <- parseTerm
+ loop t1
+ where termSuffix t1 = do
+         op <- binaryOperator
+         t2 <- parseTerm
+         case op of
+           '+' -> termSuffix (Binary Plus t1 t2)
+           '-' -> termSuffix (Binary Minus t1 t2)
+       loop t = termSuffix t <|> return t
+-}
 
 -- TODO - Needs to support repetition (factor possibly minus or plus a factor, etc)
 -- use a many-like combinator with an upper limit ? (INT_MAX)
@@ -309,8 +332,8 @@ factor :: Parser Factor
 factor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
                            expression
                            <* ws <* parseChar ')' <* ws)
-      <|> unaryOperation 
-      <|> constant 
+      <|> unaryOperation
+      <|> constant
 
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
@@ -322,7 +345,7 @@ statement = Statement <$> returnStatement  <*> expression <* semicolon
 -- TODO - NOTE: Use a data structure to represent data types (int, char etc) instead of having the same code
 -- for both returnType and variableType
 returnType :: Parser ReturnType
-returnType = f <$> 
+returnType = f <$>
   (ws *> parseString "int" <* ws <|> ws *> parseString "void" <* ws <|> ws *> parseString "char" <* ws)
   where f "int"  = ReturnType "int"
         f "void" = ReturnType "void"
@@ -330,14 +353,14 @@ returnType = f <$>
         f_       = undefined -- Proper error message
 
 variableType :: Parser VariableType
-variableType = f <$> 
+variableType = f <$>
   (ws *> parseString "int" <* ws <|> ws *> parseString "void" <* ws <|> ws *> parseString "char" <* ws)
   where f "int"  = VariableType "int"
         f "void" = VariableType "void"
         f "char" = VariableType "char"
         f_       = undefined -- Proper error message
 
--- NOTE: [a-zA-Z]\w* for now. 
+-- NOTE: [a-zA-Z]\w* for now.
 -- TODO - First char must be an alpha but others can be digits
 identifier :: Parser Identifier
 identifier = Identifier <$> spanP isAlpha
@@ -348,14 +371,14 @@ declaration = Declaration <$> variableType <*> identifier
 -- NOTE: Function parameters
 params :: Parser Params
 params = Params <$> (ws *> parseChar '(' *> ws *>
-                           elements 
+                           elements
                            <* ws <* parseChar ')' <* ws)
   where
-    elements = sepBy (ws *> parseChar ',' <* ws) declaration 
+    elements = sepBy (ws *> parseChar ',' <* ws) declaration
 
 body :: Parser Body
 body = Body <$> (ws *> parseChar '{' *> ws *>
-                           statements 
+                           statements
                            <* ws <* parseChar '}')
   where
     statements = sepBy (ws) statement
@@ -370,9 +393,9 @@ program = Program <$> function
 -- TODO - Split unary operators ?
 -- The following block of code is dedicated to assembly generation. I should put it in a separate module.
 generateUnaryOperation :: UnaryOperator -> String
-generateUnaryOperation (UnOperator op) 
+generateUnaryOperation (UnOperator op)
   | (op=='-') = "neg      %eax" ++ "\n"
-  | (op=='!') = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise 
+  | (op=='!') = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise
                 "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
                 "sete     %al"      ++ "\n"     -- set AL register (the lower byte of EAX) to 1 if ZF is on
   | (op=='~') = "not      %eax"     ++ "\n"
@@ -387,16 +410,16 @@ generateFactor = undefined
 generateExpression :: Expression -> String
 -- TODO - constant is now a Factor
 generateExpression = undefined
---generateExpression (Constant ex) = "movl     $" 
---                                 ++ show ex 
+--generateExpression (Constant ex) = "movl     $"
+--                                 ++ show ex
 --                                 ++ ", %eax"
 --                                 ++ "\n"
 -- TODO - unaryOperation is now a Factor
 -- generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
 
 generateStatement :: [Statement] -> String
-generateStatement ([Statement s ex]) 
-  | (s==Return) = generateExpression ex 
+generateStatement ([Statement s ex])
+  | (s==Return) = generateExpression ex
                   ++ "ret"
   | otherwise   = ""
 
@@ -404,11 +427,11 @@ generateBody :: Body -> String
 generateBody (Body s) = generateStatement s
 
 generateParams :: Params -> String
-generateParams (Params []) = undefined
+generateParams (Params [])     = undefined
 generateParams (Params (x:xs)) = undefined
 
 generateFunctionHead :: Identifier -> String
-generateFunctionHead (Identifier i) = ".globl _" ++ i ++ 
+generateFunctionHead (Identifier i) = ".globl _" ++ i ++
                                       "\n_" ++ i ++
                                       ":\n"
 
@@ -418,7 +441,7 @@ generateFunction (Function ret id params body) = generateFunctionHead id ++
 
 -- DOING: Traverse the AST and generate the assembly code
 generateAssembly :: Program -> String
-generateAssembly (Program f) = generateFunction f 
+generateAssembly (Program f) = generateFunction f
 
 -- Arguments handling
 flags :: [OptDescr Flag]
@@ -430,7 +453,7 @@ flags = [Option ['i'] [] (ReqArg InstructionSet "") ""
 parse argv = case getOpt Permute flags argv of
               (args, fs, []) -> do
                 let files = if null fs then ["-"] else fs
-                if Help `elem` args 
+                if Help `elem` args
                   then do hPutStrLn stderr (usageInfo header flags)
                           exitWith ExitSuccess
                   else return (nub (concatMap set args), files)
@@ -448,40 +471,41 @@ parse argv = case getOpt Permute flags argv of
 -- parsed values.
 filterInstructionSet :: [Flag] -> String
 filterInstructionSet [] = "No instruction set was given. Defaults to x86."
-filterInstructionSet list = 
-  case head [x | x@(InstructionSet _) <- list] of 
-    InstructionSet i -> i 
+filterInstructionSet list =
+  case head [x | x@(InstructionSet _) <- list] of
+    InstructionSet i -> i
     empty -> "Could not match instruction set in the list of arguments." -- Not matched!
 
 filterAssemblyOutput :: [Flag] -> String
 filterAssemblyOutput [] = "No assembly file path given."
-filterAssemblyOutput list = 
-  case head [x | x@(AssemblyFile _) <- list] of 
+filterAssemblyOutput list =
+  case head [x | x@(AssemblyFile _) <- list] of
     AssemblyFile a -> a
-    empty -> "Could not match flag in the list of arguments." -- Not matched!
+    empty          -> "Could not match flag in the list of arguments." -- Not matched!
 
 
 main :: IO ()
 main = do
-  putStrLn (unlines haskii) 
+  putStrLn (unlines haskii)
   (as, fs) <- getArgs >>= parse
-  let ins = filterInstructionSet as 
+  let ins = filterInstructionSet as
       ass = filterAssemblyOutput as
       file = fs !! 0
   putStrLn ("[INFO] Parsing source file " ++ show (fs !! 0)) >>
     readFile file >>= \ source ->
        case runParser program source of
-        Right (source, ast) -> 
+        Right (source, ast) ->
           putStrLn ("[INFO] Parsed as the following AST:\n" ++ show ast ++ "\n") >>
           putStrLn ("[INFO] Instruction set: " ++ ins) >> -- NOTE: Only x86 for now
           putStrLn ("[INFO] Assembly:\n") >>
           putStrLn asm >>
           writeFile ass asm >>
           putStrLn ("\n[INFO] Assembly code was written to: " ++ ass)
-            where 
+            where
               asm = generateAssembly ast
 
-        Left e -> 
+        Left e ->
           putStrLn ("[ERROR] Error while parsing:\n" ++ show e)
+
 
 
