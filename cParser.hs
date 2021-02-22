@@ -304,20 +304,16 @@ expression = AddOperation <$> term <*> addOperator <*> expression
           <|> SubtractOperation <$> term <*> subtractOperator <*> term
           <|> TermOperation <$> term
 
--- TODO - Check the following function and adapt it to my current program
--- Seems like Expression, Term, Factor etc all have to be of the same type.
-{-
- parseExp :: Parser Exp
- parseExp = do
- t1 <- parseTerm
- loop t1
- where termSuffix t1 = do
-         op <- binaryOperator
-         t2 <- parseTerm
-         case op of
-           '+' -> termSuffix (Binary Plus t1 t2)
-           '-' -> termSuffix (Binary Minus t1 t2)
-       loop t = termSuffix t <|> return t
+{- TODO - try with foldl1 ! It must be it!
+expression :: Parser Expression
+expression = sub
+  where
+    product = foldl1 (Binary Multiply) <$> factor `sepBy1` optional (parseChar '*')
+    sum     = foldl1 (Binary Add)      <$> product `sepBy1` parseChar '+'
+    sub     = foldr1 (Binary Sub)      <$> product `sepBy1` parseChar '-'
+    factor  = int <|> between (parseChar '(') (parseChar ')') expression
+    int     = Constant . read <$> some digit
+
 -}
 
 -- TODO - Needs to support repetition (factor possibly minus or plus a factor, etc)
