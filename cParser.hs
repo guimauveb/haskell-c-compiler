@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TupleSections #-}
 
 {- C compiler implementation in Haskell
 
@@ -55,7 +56,7 @@ instance Show Declaration where
 
 -- We only care about return statements for now
 data Statement = Return
-               | Statement Statement Expression -- Mandatory semicolon
+               | Statement Statement Expr -- Mandatory semicolon
                deriving (Show, Eq)
 
 data UnaryOperator = UnOperator Char
@@ -69,24 +70,23 @@ data BinaryOperator = MultiplicationOperator Char
 
 -- Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
 -- Yes for additions, not for subtractions.
--- Defining an expression by being a term plus or minus another term, plus or minus another term....
--- is actually super easy. We only have to define an expression recursively as itself being a term,
+-- Defining an parseExpression by being a term plus or minus another term, plus or minus another term....
+-- is actually super easy. We only have to define an parseExpression recursively as itself being a term,
 -- this way we can handle an undefined number of plus/minus other terms.
-data Expression = AddOperation Term BinaryOperator Expression
-                | SubtractOperation Term BinaryOperator Term
-                | TermOperation Term
-                deriving (Show, Eq)
-
+-- data Expr = AddOperation Expr BinaryOperator Expr
+--                 | SubtractOperation Expr BinaryOperator Expr
+--                 | TermOperation Term
+--                 deriving (Show, Eq)
+--
 -- TODO - Split binary operators into two categories ? (+,- and *,/)
 data Term = MultiplyOperation Factor BinaryOperator Term
           | DivideOperation Factor BinaryOperator Term
           | FactorTerm Factor
           deriving(Show, Eq)
 
--- A factor is an expression a unary operator can be applied to
-data Factor = WrappedExpression Expression -- WrappedExpression is an expression wrapped in parentheses
+-- A factor is an parseExpression a unary operator can be applied to
+data Factor = WrappedExpr Expr -- WrappedExpr is an parseExpression wrapped in parentheses
             | UnaryOperation UnaryOperator Factor
-            | Constant Integer
             deriving(Show, Eq)
 
 data VariableType = VariableType String
@@ -180,6 +180,11 @@ instance Alternative Parser where
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
+-- TODO - Implement Parser Monad instance
+instance Monad Parser where
+  m >>= f = _
+  return v = Parser $ \x -> Right (x,v)
+
 instance Show ParseError where show = showError
 -- TODO - Implement ParseError using catchError from Control.Monad
 -- trapError action = catchError action (return . show)
@@ -220,13 +225,13 @@ notNull (Parser p) =
        then Left $ ParseError 0 " Value is null."
     else Right (input', xs)
 
-int_max = 2147483647
+intMax = 2147483647
 
 isIntMax :: Parser String -> Parser String
 isIntMax (Parser p) =
   Parser $ \input -> do
     (input', xs) <- p input
-    if read xs > int_max
+    if read xs > intMax
        then Left $ ParseError 0 " Integer must be <= INT_MAX."
     else Right (input', xs)
 
@@ -253,21 +258,18 @@ singleQuotes = parseChar '\'' *> spanP (/='\'') <* parseChar '\''
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
 
--- TODO - constant is now a Factor
-constant :: Parser Factor
-constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
-  where f ds = Constant $ read ds
+
 
 -- TODO - Split unary operators ?
-unaryOperator :: Parser UnaryOperator
-unaryOperator = f <$>
-  (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
-  where f "-" = UnOperator '-'
-        f "~" = UnOperator '~'
-        f "!" = UnOperator '!'
-
-unaryOperation :: Parser Factor
-unaryOperation = UnaryOperation <$> unaryOperator <*> factor
+ -- unaryOperator :: Parser UnaryOperator
+ -- unaryOperator = f <$>
+ --   (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
+ --   where f "-" = UnOperator '-'
+ --         f "~" = UnOperator '~'
+ --         f "!" = UnOperator '!'
+ --
+ -- unaryOperation :: Parser Factor
+ -- unaryOperation = UnaryOperation <$> unaryOperator <*> factor
 
 addOperator :: Parser BinaryOperator
 addOperator = f <$>
@@ -295,48 +297,89 @@ binaryOperator = addOperator
               <|> multiplicationOperator
               <|> divisionOperator
 
--- TODO - Needs to support repetition (term possibly minus or plus a term, etc)
--- use a many-like combinator with an upper limit ? (INT_MAX)
-expression :: Parser Expression
-expression = AddOperation <$> term <*> addOperator <*> expression
-          --  TODO - Incorrect! Handle left associativity for subtractions
-          --  Doesn't sound easy but still doable.
-          <|> SubtractOperation <$> term <*> subtractOperator <*> term
-          <|> TermOperation <$> term
+data BinOp = Add | Sub | Multiply
+    deriving (Show, Eq)
 
-{- TODO - try with foldl1 ! It must be it!
-expression :: Parser Expression
-expression = sub
+data Expr = Binary BinOp Expr Expr
+          | Constant Integer
+          deriving (Show, Eq)
+
+
+-- TODO - constant is now a Factor
+constant :: Parser Expr
+constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
+  where f ds = Constant $ read ds
+
+-- _factor :: Parser Expr
+-- _factor = (ws *> parseChar '(' *> ws *>
+--                            parseExpression
+--                            <* ws <* parseChar ')' <* ws)
+--        <|> constant
+--
+-- _product :: Parser Expr
+-- _product = foldl1 (Binary Multiply) <$> sepBy (ws *> parseChar '*' <* ws) _factor
+--
+-- _sum :: Parser Expr
+-- _sum = foldl1 (Binary Add) <$> sepBy (ws *> parseChar '+' <* ws) _product
+
+
+{--
+bind :: Parser a -> (a -> Parser b) -> Parser b
+bind p f = Parser (\orig ->
+  parse p orig |>
+    map(\ (a, remaining) ->
+      parse (f a) remaining |>
+        concat)
+                  )
+--}
+-- <exp> ::= <term> { ("+" | "-") } <term> }
+-- <term> ::= <factor> { ("*" | "/") <factor> }
+-- <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int>
+parseExp :: Parser Expr
+parseExp = do
+  t1 <- constant
+  loop t1
+  where termSuffix t1 = do
+          t2 <- constant
+          op <- constant
+          case op of
+            constant -> loop (Binary Add t1 t2)
+        loop t = termSuffix t <|> return t
+ {- TODO - try with foldl1 ! It must be it!
+parseExpression :: Parser Expr
+parseExpression = sub
   where
-    product = foldl1 (Binary Multiply) <$> factor `sepBy1` optional (parseChar '*')
     sum     = foldl1 (Binary Add)      <$> product `sepBy1` parseChar '+'
     sub     = foldr1 (Binary Sub)      <$> product `sepBy1` parseChar '-'
-    factor  = int <|> between (parseChar '(') (parseChar ')') expression
+    product = foldl1 (Binary Multiply) <$> factor `sepBy1` optional (parseChar '*')
+    factor  = int <|> between (parseChar '(') (parseChar ')') parseExpression
     int     = Constant . read <$> some digit
 
 -}
 
 -- TODO - Needs to support repetition (factor possibly minus or plus a factor, etc)
 -- use a many-like combinator with an upper limit ? (INT_MAX)
-term :: Parser Term
-term = MultiplyOperation <$> factor <*> multiplicationOperator <*> term
-    <|> DivideOperation <$> factor <*> divisionOperator <*> term
-    <|> FactorTerm <$> factor
-
--- A factor is an expression a unary operator can be applied to.
-factor :: Parser Factor
-factor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
-                           expression
-                           <* ws <* parseChar ')' <* ws)
-      <|> unaryOperation
-      <|> constant
+parseTerm :: Parser Expr
+parseTerm = undefined
+--term = MultiplyOperation <$> factor <*> multiplicationOperator <*> term
+--    <|> DivideOperation <$> factor <*> divisionOperator <*> term
+--    <|> FactorTerm <$> factor
+--
+-- A factor is an parseExpression a unary operator can be applied to.
+-- factor :: Parser Factor
+-- factor = WrappedExpr <$> (ws *> parseChar '(' *> ws *>
+--                            parseExpression
+--                            <* ws <* parseChar ')' <* ws)
+--       <|> unaryOperation
+--       <|> constant
 
 returnStatement :: Parser Statement
 returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
 
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
-statement :: Parser Statement
-statement = Statement <$> returnStatement  <*> expression <* semicolon
+-- statement :: Parser Statement
+-- statement = Statement <$> returnStatement  <*> parseExpression <* semicolon
+statement = undefined
 
 -- TODO - NOTE: Use a data structure to represent data types (int, char etc) instead of having the same code
 -- for both returnType and variableType
@@ -403,19 +446,19 @@ generateTerm = undefined
 generateFactor :: Factor -> String
 generateFactor = undefined
 
-generateExpression :: Expression -> String
+generateExpr :: Expr -> String
 -- TODO - constant is now a Factor
-generateExpression = undefined
---generateExpression (Constant ex) = "movl     $"
+generateExpr = undefined
+--generateExpr (Constant ex) = "movl     $"
 --                                 ++ show ex
 --                                 ++ ", %eax"
 --                                 ++ "\n"
 -- TODO - unaryOperation is now a Factor
--- generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
+-- generateExpr (UnaryOperation unop exp) =  generateExpr exp ++ generateUnaryOperation unop
 
 generateStatement :: [Statement] -> String
 generateStatement ([Statement s ex])
-  | (s==Return) = generateExpression ex
+  | (s==Return) = generateExpr ex
                   ++ "ret"
   | otherwise   = ""
 
@@ -451,7 +494,7 @@ parse argv = case getOpt Permute flags argv of
                 let files = if null fs then ["-"] else fs
                 if Help `elem` args
                   then do hPutStrLn stderr (usageInfo header flags)
-                          exitWith ExitSuccess
+                          exitSuccess
                   else return (nub (concatMap set args), files)
 
               (_,_,errs)    -> do
@@ -486,14 +529,13 @@ main = do
   (as, fs) <- getArgs >>= parse
   let ins = filterInstructionSet as
       ass = filterAssemblyOutput as
-      file = fs !! 0
-  putStrLn ("[INFO] Parsing source file " ++ show (fs !! 0)) >>
+      file = head fs
+  putStrLn ("[INFO] Parsing source file " ++ show (head fs)) >>
     readFile file >>= \ source ->
        case runParser program source of
         Right (source, ast) ->
           putStrLn ("[INFO] Parsed as the following AST:\n" ++ show ast ++ "\n") >>
-          putStrLn ("[INFO] Instruction set: " ++ ins) >> -- NOTE: Only x86 for now
-          putStrLn ("[INFO] Assembly:\n") >>
+          putStrLn ("[INFO] Instruction set: " ++ ins ++ "[INFO] Assembly:\n") >> -- NOTE: Only x86 for now
           putStrLn asm >>
           writeFile ass asm >>
           putStrLn ("\n[INFO] Assembly code was written to: " ++ ass)
