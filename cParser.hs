@@ -180,9 +180,11 @@ instance Alternative Parser where
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
--- TODO - Implement Parser Monad instance
+-- TODO - Make sure I'm right here and handle Left/Right
 instance Monad Parser where
-  m >>= f = _
+  Parser p1 >>= f = Parser (\input1 -> let Right (str, parsed) = p1 input1
+                                           Parser p2 = f parsed in
+                                           p2 str)
   return v = Parser $ \x -> Right (x,v)
 
 instance Show ParseError where show = showError
@@ -341,9 +343,9 @@ parseExp = do
   loop t1
   where termSuffix t1 = do
           t2 <- constant
-          op <- constant
+          op <- binaryOperator
           case op of
-            constant -> loop (Binary Add t1 t2)
+            addOperator -> loop (Binary Add t1 t2)
         loop t = termSuffix t <|> return t
  {- TODO - try with foldl1 ! It must be it!
 parseExpression :: Parser Expr
