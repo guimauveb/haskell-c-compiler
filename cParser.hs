@@ -12,11 +12,6 @@
        eax
         7
 
-TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
-an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from
-parseString but from parseChar trying to parse the character that follows "return", even though the error occured
-in parseString!
-
 -}
 
 module Main where
@@ -50,12 +45,20 @@ data Declaration = Declaration VariableType Identifier
                  deriving Eq
 
 instance Show Declaration where
-  show (Declaration a b) = "Declaration " ++ show a ++ " " ++ show b
+  show (Declaration var identifier) = "Declaration " ++ show var ++ " " ++ show identifier
                          ++ "           "
+data BinOp = Add | Sub | Multiply | Divide
+    deriving (Show, Eq)
+
+data Expression = Binary BinOp Expression Expression
+          | Unary UnaryOperator Expression
+          | Constant Integer
+          | WrappedExpression Expression
+          deriving(Show, Eq)
 
 -- We only care about return statements for now
 data Statement = Return
-               | Statement Statement Expression -- Mandatory semicolon
+               | Statement Statement Expression
                deriving (Show, Eq)
 
 newtype UnaryOperator = UnOperator Char
@@ -74,20 +77,20 @@ newtype ReturnType = ReturnType String
                 deriving Eq
 
 instance Show ReturnType where
-  show (ReturnType a) = "ReturnType " ++ show a ++ " "
+  show (ReturnType ret) = "Returns " ++ show ret ++ " "
 
 newtype Identifier = Identifier String
                 deriving Eq
 
 instance Show Identifier where
-  show (Identifier a) = show a ++ "\n"
+  show (Identifier identifier) = show identifier ++ "\n"
 
 -- Function parameters
 newtype Params = Params [Declaration]
             deriving Eq
 
 instance Show Params where
-  show (Params a) = "    Params " ++ show a ++ "\n"
+  show (Params params) = "    Params " ++ show params ++ "\n"
 
 -- A function body will be reduced to a list of statements for the moment
 newtype Body = Body [Statement]
@@ -100,8 +103,8 @@ data Function = Function ReturnType Identifier Params Body
               deriving Eq
 
 instance Show Function where
-  show (Function a b c d) = "  Function " ++
-    show a ++ show b ++ show c ++ show d
+  show (Function return identifier params body) = "  Function " ++
+    show return ++ show identifier ++ show params ++ show body
 
 newtype Program = Program Function
              deriving Eq
@@ -111,6 +114,7 @@ instance Show Program where
 
 data ParseError = ParseError Int String
 --  deriving (Show, Eq)
+
 
 -- Pun intended
 haskii = ["",
@@ -133,13 +137,23 @@ instance Alternative (Either ParseError) where
     m      <|> _ = m
 
 
-newtype Parser a = Parser
-  { runParser :: String -> Either ParseError (String, a) }
 
--- TODO - Error checking
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
+instance Show ParseError where show = showError
+-- TODO - Implement ParseError using catchError from Control.Monad
+-- trapError action = catchError action (return . show)
+
+newtype Parser a = Parser
+  { runParser :: String -> Either ParseError (String, a) }
+
+{--
+   TODO - Error handling using Either works but doesn't always return the proper error message. For instance when
+          an error occurs in parseString (let's say when "return" isn't matched) the error displayed doesn't come from
+          parseString but from parseChar trying to parse the character that follows "return", even though the error occured
+          in parseString!
+--}
 deParser :: Parser a -> String -> Either ParseError (String, a)
 deParser (Parser p) = p
 
@@ -162,13 +176,14 @@ instance Alternative Parser where
   (Parser p1) <|> (Parser p2) =
     Parser $ \input -> p1 input <|> p2 input
 
-{-- Explaination:
+{--
+   Enter the monad ...
      >>== (bind) takes a parser in 'a' and a function from 'a' to a parser in 'b', and returns a parser in 'b'.
      The resulting parser is made by wrapping 'q :: String -> Either ParserError (String, b)' in the Parser
      constructor 'Parser'. Then 'q', the combined parser, takes a 'String' called 'input' and applies the function
      'p1 :: String -> Either ParseError (String, a)' that we got from pattern matching against the first parser,
-     and pattern matches on the result. In case of error, we return 'ParseError'. In case of success, we get two things:
-     the still unparsed string called 'rest' and the result 'a'. We give 'a' to 'f', the second parser combinator, and get
+     and pattern matches on the result. In case of error, we return 'ParseError'. In case of success, we get the still
+     unparsed string ('rest') and the result 'a'. We give 'a' to 'f', the second parser combinator, and get
      a 'Parser b' which we need to unwrap with 'deParser' to get a function '(String -> Either ParseError (String, b)' back.
      That function can be applied to 'rest' for the final result of the combined parsers.
 --}
@@ -180,10 +195,6 @@ instance Monad Parser where
                 Left $ ParseError 1 " There was an error."
 
   return parsed = Parser $ \rest -> Right (rest,parsed)
-
-instance Show ParseError where show = showError
--- TODO - Implement ParseError using catchError from Control.Monad
--- trapError action = catchError action (return . show)
 
 parseChar :: Char -> Parser Char
 parseChar x = Parser f
@@ -247,7 +258,8 @@ sepBy :: Parser a -> Parser b -> Parser [b]
 sepBy sep element = (:) <$> element <*> many (sep *> element)
                  <|> pure []
 
--- Strings can be wrapped either into single or double quotes. No escaping yet
+-- Strings can be wrapped either into single or double quotes.
+-- TODO - Escaping
 doubleQuotes = parseChar '"'  *> spanP (/='"')  <* parseChar '"'
 singleQuotes = parseChar '\'' *> spanP (/='\'') <* parseChar '\''
 
@@ -289,16 +301,6 @@ binaryOperator = addOperator
               <|> subtractOperator
               <|> multiplicationOperator
               <|> divisionOperator
-
-data BinOp = Add | Sub | Multiply | Divide
-    deriving (Show, Eq)
-
-data Expression = Binary BinOp Expression Expression
-          | Unary UnaryOperator Expression
-          | Constant Integer
-          | FactorTerm Expression
-          | WrappedExpression Expression
-          deriving(Show, Eq)
 
 
 constant :: Parser Expression
@@ -389,7 +391,7 @@ body = Body <$> (ws *> parseChar '{' *> ws *>
 function :: Parser Function
 function = Function <$> returnType <*> identifier <*> params <*> body
 
--- NOTE: Program must return a list of functions
+-- TODO - Program must return a list of functions (at least for now)
 program :: Parser Program
 program = Program <$> function
 
@@ -399,8 +401,8 @@ generateUnaryOperation :: UnaryOperator -> String
 generateUnaryOperation (UnOperator op)
   | op=='-' = "neg      %eax" ++ "\n"
   | op=='!' = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise
-                "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
-                "sete     %al"      ++ "\n"     -- set AL register (the lower byte of EAX) to 1 if ZF is on
+              "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
+              "sete     %al"      ++ "\n"     -- set AL register (the lower byte of EAX) to 1 if ZF is on
   | op=='~' = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
@@ -410,15 +412,14 @@ generateTerm = undefined
 generateFactor :: Expression -> String
 generateFactor = undefined
 
+-- TODO - Handle new definitions!
 generateExpression :: Expression -> String
--- TODO - constant is now a Factor
-generateExpression = undefined
---generateExpression (Constant ex) = "movl     $"
---                                 ++ show ex
---                                 ++ ", %eax"
---                                 ++ "\n"
--- TODO - unaryOperation is now a Factor
--- generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
+generateExpression (Constant ex) = "movl     $"
+                                 ++ show ex
+                                 ++ ", %eax"
+                                 ++ "\n"
+generateExpression (Unary unop exp) =  generateExpression exp ++ generateUnaryOperation unop
+-- generateExpression _ = empty
 
 generateStatement :: [Statement] -> String
 generateStatement [Statement s ex]
