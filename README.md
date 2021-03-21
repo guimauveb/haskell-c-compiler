@@ -5,11 +5,11 @@ From Nora Sandler's article [Write a C Compiler](https://norasandler.com/2017/11
 With the help of Tsoding great video [JSON Parser 100% From Scratch in Haskell](https://www.youtube.com/watch?v=N9RUqGYuGfw&t=957s)
 
 ### Details
-My goal is to learn more about functionnal programming, Haskell being king in this realm, and more about compilers, C and assembly.  
+My goal is to learn more about functionnal programming, Haskell being king in this realm, and more about compilers, C and assembly.
 
 - **Part 1: Done!**
 - **Part 2: Done!**
-- **Part 3: Almost done. Working on associativity and how to handle an undefined number of binary operations.**
+- **Part 3: Parsing done. Properly parses binary expressions and correctly handles associativity. Working on code generation now.
 
 ### Usage
 
@@ -26,7 +26,7 @@ My goal is to learn more about functionnal programming, Haskell being king in th
 
 - To link the generated assembly file and create a vaid executable, use gcc or clang:
 ```
-    $ gcc assembly.s -o out 
+    $ gcc assembly.s -o out
 ```
 
 Passes all stage 1 and stage 2 tests:
@@ -42,11 +42,11 @@ Stage 1 tests:
         spaces.c                PASS
 
     Invalid:
-        missing_paren.c         PASS 
+        missing_paren.c         PASS
         missing_retval.c        PASS
         no_brace.c              PASS
         no_semicolon.c          PASS
-        no_space.c              PASS 
+        no_space.c              PASS
         wrong_case.c            PASS
 
 Stage 2 tests:
@@ -69,8 +69,8 @@ Stage 2 tests:
 Stage 3 tests:
     Valid:
         add.c                   PASS
-        associativity.c         FAIL
-        associativity_2.c       FAIL
+        associativity.c         PASS
+        associativity_2.c       PASS
         div.c                   PASS
         div_neg.c               PASS
         mult.c                  PASS
@@ -80,7 +80,7 @@ Stage 3 tests:
         sub_neg.c               PASS
         unop_add.c              PASS
         unop_parens.cs          PASS
-        
+
     Invalid:
         malformed_paren.c       PASS
         missing_first_op.c      PASS
