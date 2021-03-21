@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TupleSections #-}
 
 {- C compiler implementation in Haskell
 
@@ -59,7 +58,7 @@ data Statement = Return
                | Statement Statement Expr -- Mandatory semicolon
                deriving (Show, Eq)
 
-data UnaryOperator = UnOperator Char
+newtype UnaryOperator = UnOperator Char
                    deriving (Show, Eq)
 
 data BinaryOperator = MultiplicationOperator Char
@@ -68,51 +67,30 @@ data BinaryOperator = MultiplicationOperator Char
                     | SubtractOperator Char
                     deriving (Show, Eq)
 
--- Is our program able to handle repetition ? That is, in EBNF notation: <term> { ("+" | "-") <term> }
--- Yes for additions, not for subtractions.
--- Defining an parseExpression by being a term plus or minus another term, plus or minus another term....
--- is actually super easy. We only have to define an parseExpression recursively as itself being a term,
--- this way we can handle an undefined number of plus/minus other terms.
--- data Expr = AddOperation Expr BinaryOperator Expr
---                 | SubtractOperation Expr BinaryOperator Expr
---                 | TermOperation Term
---                 deriving (Show, Eq)
---
--- TODO - Split binary operators into two categories ? (+,- and *,/)
-data Term = MultiplyOperation Factor BinaryOperator Term
-          | DivideOperation Factor BinaryOperator Term
-          | FactorTerm Factor
-          deriving(Show, Eq)
-
--- A factor is an parseExpression a unary operator can be applied to
-data Factor = WrappedExpr Expr -- WrappedExpr is an parseExpression wrapped in parentheses
-            | UnaryOperation UnaryOperator Factor
-            deriving(Show, Eq)
-
-data VariableType = VariableType String
+newtype VariableType = VariableType String
                   deriving (Show, Eq)
 
-data ReturnType = ReturnType String
+newtype ReturnType = ReturnType String
                 deriving Eq
 
 instance Show ReturnType where
   show (ReturnType a) = "ReturnType " ++ show a ++ " "
 
-data Identifier = Identifier String
+newtype Identifier = Identifier String
                 deriving Eq
 
 instance Show Identifier where
   show (Identifier a) = show a ++ "\n"
 
 -- Function parameters
-data Params = Params [Declaration]
+newtype Params = Params [Declaration]
             deriving Eq
 
 instance Show Params where
   show (Params a) = "    Params " ++ show a ++ "\n"
 
 -- A function body will be reduced to a list of statements for the moment
-data Body = Body [Statement]
+newtype Body = Body [Statement]
           deriving Eq
 
 instance Show Body where
@@ -125,7 +103,7 @@ instance Show Function where
   show (Function a b c d) = "  Function " ++
     show a ++ show b ++ show c ++ show d
 
-data Program = Program Function
+newtype Program = Program Function
              deriving Eq
 
 instance Show Program where
@@ -154,11 +132,16 @@ instance Alternative (Either ParseError) where
     Left _ <|> n = n
     m      <|> _ = m
 
+
 newtype Parser a = Parser
   { runParser :: String -> Either ParseError (String, a) }
 
-dePsr :: Parser a -> String -> Either ParseError (String, a)
-dePsr (Parser p) = p
+-- DOING: Error checking
+showError :: ParseError -> String
+showError (ParseError loc var) = show loc ++ var
+
+deParser :: Parser a -> String -> Either ParseError (String, a)
+deParser (Parser p) = p
 
 instance Functor Parser where
   fmap f (Parser p) =
@@ -179,19 +162,24 @@ instance Alternative Parser where
   (Parser p1) <|> (Parser p2) =
     Parser $ \input -> p1 input <|> p2 input
 
--- DOING: Error checking
-showError :: ParseError -> String
-showError (ParseError loc var) = show loc ++ var
-
--- TODO -  Implement Parser Monad instance
+  {-- Explaination:
+     >>== (bind) takes a parser in 'a' and a function from 'a' to a parser in 'b', and returns a parser in 'b'.
+     The resulting parser is made by wrapping 'q :: String -> Either ParserError (String, b)' in the Parser
+     constructor 'Parser'. Then 'q', the combined parser, takes a 'String' called 'input' and applies the function
+     'p1 :: String -> Either ParseError (String, a)' that we got from pattern matching against the first parser,
+     and pattern matches on the result. In case of error, we return 'ParseError'. In case of success, we get two things:
+     the still unparsed string called 'rest' and the result 'a'. We give 'a' to 'f', the second parser combinator, and get
+     a 'Parser b' which we need to unwrap with 'deParser' to get a function '(String -> Either ParseError (String, b)' back.
+     That function can be applied to 'rest' for the final result of the combined parsers.
+     --}
 instance Monad Parser where
-  Parser p1 >>= f = Parser p2 where
-    p2 input = case p1 input of
-              Right (rest, a) -> runParser (f a) rest
-              Left (ParseError 0 " ") -> empty
-              _ -> empty
+  Parser p1 >>= f = Parser q where
+    q input = case p1 input of
+              Right (rest, a) -> deParser (f a) rest
+              Left _ ->
+                Left $ ParseError 1 " There was an error."
 
-  return v = Parser $ \x -> Right (x,v)
+  return parsed = Parser $ \rest -> Right (rest,parsed)
 
 instance Show ParseError where show = showError
 -- TODO - Implement ParseError using catchError from Control.Monad
@@ -243,12 +231,12 @@ isIntMax (Parser p) =
        then Left $ ParseError 0 " Integer must be <= INT_MAX."
     else Right (input', xs)
 
--- NOTE: discard whitespace
+-- Discard whitespace
 -- Returns True for any Unicode space character, and the control characters \t, \n, \r, \f, \v.
 ws :: Parser String
 ws = spanP isSpace
 
--- NOTE: Mandatory whitespace
+-- Mandatory whitespace
 mandWs :: Parser String
 mandWs = spanP (not . isSpace)
 
@@ -259,25 +247,22 @@ sepBy :: Parser a -> Parser b -> Parser [b]
 sepBy sep element = (:) <$> element <*> many (sep *> element)
                  <|> pure []
 
--- NOTE: Strings can be wrapped either into single or double quotes. No escaping yet
+-- Strings can be wrapped either into single or double quotes. No escaping yet
 doubleQuotes = parseChar '"'  *> spanP (/='"')  <* parseChar '"'
 singleQuotes = parseChar '\'' *> spanP (/='\'') <* parseChar '\''
 
 stringLiteral :: Parser String
 stringLiteral = singleQuotes <|> doubleQuotes
 
+unaryOperator :: Parser UnaryOperator
+unaryOperator = f <$>
+  (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
+    where f "-" = UnOperator '-'
+          f "~" = UnOperator '~'
+          f "!" = UnOperator '!'
 
-
--- TODO - Split unary operators ?
- -- unaryOperator :: Parser UnaryOperator
- -- unaryOperator = f <$>
- --   (ws *> parseString "-" <* ws <|> ws *> parseString "~" <* ws <|> ws *> parseString "!" <* ws)
- --   where f "-" = UnOperator '-'
- --         f "~" = UnOperator '~'
- --         f "!" = UnOperator '!'
- --
- -- unaryOperation :: Parser Factor
- -- unaryOperation = UnaryOperation <$> unaryOperator <*> factor
+unaryOperation :: Parser Expr
+unaryOperation = Unary <$> unaryOperator <*> parseFactor
 
 addOperator :: Parser BinaryOperator
 addOperator = f <$>
@@ -305,84 +290,56 @@ binaryOperator = addOperator
               <|> multiplicationOperator
               <|> divisionOperator
 
-data BinOp = Add | Sub | Multiply
+data BinOp = Add | Sub | Multiply | Divide
     deriving (Show, Eq)
 
 data Expr = Binary BinOp Expr Expr
+          | Unary UnaryOperator Expr
           | Constant Integer
-          deriving (Show, Eq)
+          | FactorTerm Expr
+          | WrappedExpr Expr
+          deriving(Show, Eq)
 
 
--- TODO - constant is now a Factor
 constant :: Parser Expr
 constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
   where f ds = Constant $ read ds
 
--- _factor :: Parser Expr
--- _factor = (ws *> parseChar '(' *> ws *>
---                            parseExpression
---                            <* ws <* parseChar ')' <* ws)
---        <|> constant
---
--- _product :: Parser Expr
--- _product = foldl1 (Binary Multiply) <$> sepBy (ws *> parseChar '*' <* ws) _factor
---
--- _sum :: Parser Expr
--- _sum = foldl1 (Binary Add) <$> sepBy (ws *> parseChar '+' <* ws) _product
-
-
-{--
-bind :: Parser a -> (a -> Parser b) -> Parser b
-bind p f = Parser (\orig ->
-  parse p orig |>
-    map(\ (a, remaining) ->
-      parse (f a) remaining |>
-        concat)
-                  )
---}
--- <exp> ::= <term> { ("+" | "-") } <term> }
--- <term> ::= <factor> { ("*" | "/") <factor> }
--- <factor> ::= "(" <exp> ")" | <unary_op> <factor> | <int>
 parseExp :: Parser Expr
 parseExp = do
-  t1 <- constant
+  t1 <- parseTerm
   loop t1
   where termSuffix t1 = do
-          t2 <- constant
           op <- binaryOperator
+          t2 <- parseTerm
           case op of
-            addOperator -> loop (Binary Add t1 t2)
+            AdditionOperator '+' -> loop (Binary Add t1 t2)
+            SubtractOperator '-' -> loop (Binary Sub t1 t2)
         loop t = termSuffix t <|> return t
- {- TODO - try with foldl1 ! It must be it!
-parseExpression :: Parser Expr
-parseExpression = sub
-  where
-    sum     = foldl1 (Binary Add)      <$> product `sepBy1` parseChar '+'
-    sub     = foldr1 (Binary Sub)      <$> product `sepBy1` parseChar '-'
-    product = foldl1 (Binary Multiply) <$> factor `sepBy1` optional (parseChar '*')
-    factor  = int <|> between (parseChar '(') (parseChar ')') parseExpression
-    int     = Constant . read <$> some digit
 
--}
-
--- TODO - Needs to support repetition (factor possibly minus or plus a factor, etc)
--- use a many-like combinator with an upper limit ? (INT_MAX)
 parseTerm :: Parser Expr
-parseTerm = undefined
---term = MultiplyOperation <$> factor <*> multiplicationOperator <*> term
---    <|> DivideOperation <$> factor <*> divisionOperator <*> term
---    <|> FactorTerm <$> factor
---
--- A factor is an parseExpression a unary operator can be applied to.
--- factor :: Parser Factor
--- factor = WrappedExpr <$> (ws *> parseChar '(' *> ws *>
---                            parseExpression
---                            <* ws <* parseChar ')' <* ws)
---       <|> unaryOperation
---       <|> constant
+parseTerm = do
+  f1 <- parseFactor
+  loop f1
+    where factorSuffix f1 = do
+            op <- binaryOperator
+            f2 <- parseFactor
+            case op of
+              MultiplicationOperator '*' -> loop (Binary Multiply f1 f2)
+              DivisionOperator '/' -> loop (Binary Divide f1 f2)
+              _ -> empty
+          loop t = factorSuffix t <|> return t
+
+-- A factor is an expression a unary operator can be applied to.
+parseFactor :: Parser Expr
+parseFactor = WrappedExpr <$> (ws *> parseChar '(' *> ws *>
+                           parseExp
+                           <* ws <* parseChar ')' <* ws)
+      <|> unaryOperation
+      <|> constant
 
 returnStatement :: Parser Statement
-returnStatement = (\_ -> Return) <$> parseString "return" <* mandWs -- There must be a white space after return
+returnStatement = (Return <$ parseString "return") <* mandWs -- There must be a white space after return
 
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
 -- statement :: Parser Statement
@@ -428,7 +385,7 @@ body = Body <$> (ws *> parseChar '{' *> ws *>
                            statements
                            <* ws <* parseChar '}')
   where
-    statements = sepBy (ws) statement
+    statements = sepBy ws statement
 
 function :: Parser Function
 function = Function <$> returnType <*> identifier <*> params <*> body
@@ -441,17 +398,17 @@ program = Program <$> function
 -- The following block of code is dedicated to assembly generation. I should put it in a separate module.
 generateUnaryOperation :: UnaryOperator -> String
 generateUnaryOperation (UnOperator op)
-  | (op=='-') = "neg      %eax" ++ "\n"
-  | (op=='!') = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise
+  | op=='-' = "neg      %eax" ++ "\n"
+  | op=='!' = "cmpl     $0, %eax" ++ "\n" ++  -- set ZF on if exp == 0, set it off otherwise
                 "movl     $0, %eax" ++ "\n" ++  -- zero out EAX (doesn't change FLAGS)
                 "sete     %al"      ++ "\n"     -- set AL register (the lower byte of EAX) to 1 if ZF is on
-  | (op=='~') = "not      %eax"     ++ "\n"
+  | op=='~' = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
-generateTerm :: Term -> String
+generateTerm :: Expr -> String
 generateTerm = undefined
 
-generateFactor :: Factor -> String
+generateFactor :: Expr -> String
 generateFactor = undefined
 
 generateExpr :: Expr -> String
@@ -465,8 +422,8 @@ generateExpr = undefined
 -- generateExpr (UnaryOperation unop exp) =  generateExpr exp ++ generateUnaryOperation unop
 
 generateStatement :: [Statement] -> String
-generateStatement ([Statement s ex])
-  | (s==Return) = generateExpr ex
+generateStatement [Statement s ex]
+  | s==Return = generateExpr ex
                   ++ "ret"
   | otherwise   = ""
 
@@ -512,7 +469,7 @@ parse argv = case getOpt Permute flags argv of
                     set f = [f]
 
 -- These two functions do basically the same thing. They take a list of flags and match a datatype then return its
--- string value. See how I could abstract them so that I can pass any datatype and abstract away its string value.
+-- string value. See how I could abstract them out so that I can pass any datatype and abstract away its string value.
 -- Like so: filterFlag Flag <anyStr> -> anyStr
 -- Or at least return the consumed input and the rest of the list, so we don't move the list around with already
 -- parsed values.
