@@ -157,6 +157,9 @@ instance Alternative (Either ParseError) where
 newtype Parser a = Parser
   { runParser :: String -> Either ParseError (String, a) }
 
+dePsr :: Parser a -> String -> Either ParseError (String, a)
+dePsr (Parser p) = p
+
 instance Functor Parser where
   fmap f (Parser p) =
     Parser $ \input -> do
@@ -180,11 +183,14 @@ instance Alternative Parser where
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
--- TODO - Make sure I'm right here and handle Left/Right
+-- TODO -  Implement Parser Monad instance
 instance Monad Parser where
-  Parser p1 >>= f = Parser (\input1 -> let Right (str, parsed) = p1 input1
-                                           Parser p2 = f parsed in
-                                           p2 str)
+  Parser p1 >>= f = Parser p2 where
+    p2 input = case p1 input of
+              Right (rest, a) -> runParser (f a) rest
+              Left (ParseError 0 " ") -> empty
+              _ -> empty
+
   return v = Parser $ \x -> Right (x,v)
 
 instance Show ParseError where show = showError
