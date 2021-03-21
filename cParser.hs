@@ -55,7 +55,7 @@ instance Show Declaration where
 
 -- We only care about return statements for now
 data Statement = Return
-               | Statement Statement Expr -- Mandatory semicolon
+               | Statement Statement Expression -- Mandatory semicolon
                deriving (Show, Eq)
 
 newtype UnaryOperator = UnOperator Char
@@ -136,7 +136,7 @@ instance Alternative (Either ParseError) where
 newtype Parser a = Parser
   { runParser :: String -> Either ParseError (String, a) }
 
--- DOING: Error checking
+-- TODO - Error checking
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
 
@@ -162,7 +162,7 @@ instance Alternative Parser where
   (Parser p1) <|> (Parser p2) =
     Parser $ \input -> p1 input <|> p2 input
 
-  {-- Explaination:
+{-- Explaination:
      >>== (bind) takes a parser in 'a' and a function from 'a' to a parser in 'b', and returns a parser in 'b'.
      The resulting parser is made by wrapping 'q :: String -> Either ParserError (String, b)' in the Parser
      constructor 'Parser'. Then 'q', the combined parser, takes a 'String' called 'input' and applies the function
@@ -171,7 +171,7 @@ instance Alternative Parser where
      the still unparsed string called 'rest' and the result 'a'. We give 'a' to 'f', the second parser combinator, and get
      a 'Parser b' which we need to unwrap with 'deParser' to get a function '(String -> Either ParseError (String, b)' back.
      That function can be applied to 'rest' for the final result of the combined parsers.
-     --}
+--}
 instance Monad Parser where
   Parser p1 >>= f = Parser q where
     q input = case p1 input of
@@ -261,7 +261,7 @@ unaryOperator = f <$>
           f "~" = UnOperator '~'
           f "!" = UnOperator '!'
 
-unaryOperation :: Parser Expr
+unaryOperation :: Parser Expression
 unaryOperation = Unary <$> unaryOperator <*> parseFactor
 
 addOperator :: Parser BinaryOperator
@@ -293,20 +293,20 @@ binaryOperator = addOperator
 data BinOp = Add | Sub | Multiply | Divide
     deriving (Show, Eq)
 
-data Expr = Binary BinOp Expr Expr
-          | Unary UnaryOperator Expr
+data Expression = Binary BinOp Expression Expression
+          | Unary UnaryOperator Expression
           | Constant Integer
-          | FactorTerm Expr
-          | WrappedExpr Expr
+          | FactorTerm Expression
+          | WrappedExpression Expression
           deriving(Show, Eq)
 
 
-constant :: Parser Expr
+constant :: Parser Expression
 constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
   where f ds = Constant $ read ds
 
-parseExp :: Parser Expr
-parseExp = do
+parseExpression :: Parser Expression
+parseExpression = do
   t1 <- parseTerm
   loop t1
   where termSuffix t1 = do
@@ -317,7 +317,7 @@ parseExp = do
             SubtractOperator '-' -> loop (Binary Sub t1 t2)
         loop t = termSuffix t <|> return t
 
-parseTerm :: Parser Expr
+parseTerm :: Parser Expression
 parseTerm = do
   f1 <- parseFactor
   loop f1
@@ -331,9 +331,9 @@ parseTerm = do
           loop t = factorSuffix t <|> return t
 
 -- A factor is an expression a unary operator can be applied to.
-parseFactor :: Parser Expr
-parseFactor = WrappedExpr <$> (ws *> parseChar '(' *> ws *>
-                           parseExp
+parseFactor :: Parser Expression
+parseFactor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
+                           parseExpression
                            <* ws <* parseChar ')' <* ws)
       <|> unaryOperation
       <|> constant
@@ -342,9 +342,8 @@ returnStatement :: Parser Statement
 returnStatement = (Return <$ parseString "return") <* mandWs -- There must be a white space after return
 
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
--- statement :: Parser Statement
--- statement = Statement <$> returnStatement  <*> parseExpression <* semicolon
-statement = undefined
+statement :: Parser Statement
+statement = Statement <$> returnStatement  <*> parseExpression <* semicolon
 
 -- TODO - NOTE: Use a data structure to represent data types (int, char etc) instead of having the same code
 -- for both returnType and variableType
@@ -405,25 +404,25 @@ generateUnaryOperation (UnOperator op)
   | op=='~' = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
-generateTerm :: Expr -> String
+generateTerm :: Expression -> String
 generateTerm = undefined
 
-generateFactor :: Expr -> String
+generateFactor :: Expression -> String
 generateFactor = undefined
 
-generateExpr :: Expr -> String
+generateExpression :: Expression -> String
 -- TODO - constant is now a Factor
-generateExpr = undefined
---generateExpr (Constant ex) = "movl     $"
+generateExpression = undefined
+--generateExpression (Constant ex) = "movl     $"
 --                                 ++ show ex
 --                                 ++ ", %eax"
 --                                 ++ "\n"
 -- TODO - unaryOperation is now a Factor
--- generateExpr (UnaryOperation unop exp) =  generateExpr exp ++ generateUnaryOperation unop
+-- generateExpression (UnaryOperation unop exp) =  generateExpression exp ++ generateUnaryOperation unop
 
 generateStatement :: [Statement] -> String
 generateStatement [Statement s ex]
-  | s==Return = generateExpr ex
+  | s==Return = generateExpression ex
                   ++ "ret"
   | otherwise   = ""
 
