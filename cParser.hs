@@ -47,14 +47,15 @@ data Declaration = Declaration VariableType Identifier
 instance Show Declaration where
   show (Declaration var identifier) = "Declaration " ++ show var ++ " " ++ show identifier
                          ++ "           "
+
 data BinOp = Add | Sub | Multiply | Divide
     deriving (Show, Eq)
 
 data Expression = Binary BinOp Expression Expression
-          | Unary UnaryOperator Expression
-          | Constant Integer
-          | WrappedExpression Expression
-          deriving(Show, Eq)
+                | Unary UnaryOperator Expression
+                | Constant Integer
+                | WrappedExpression Expression
+                deriving(Show, Eq)
 
 -- We only care about return statements for now
 data Statement = Return
@@ -64,10 +65,10 @@ data Statement = Return
 newtype UnaryOperator = UnOperator Char
                    deriving (Show, Eq)
 
-data BinaryOperator = MultiplicationOperator Char
-                    | DivisionOperator Char
-                    | AdditionOperator Char
-                    | SubtractOperator Char
+data BinaryOperator = MultiplicationOperator
+                    | DivisionOperator
+                    | AdditionOperator
+                    | SubtractOperator
                     deriving (Show, Eq)
 
 newtype VariableType = VariableType String
@@ -92,7 +93,7 @@ newtype Params = Params [Declaration]
 instance Show Params where
   show (Params params) = "    Params " ++ show params ++ "\n"
 
--- A function body will be reduced to a list of statements for the moment
+-- A function body will be limited to a list of statements for the moment (which it may be is)
 newtype Body = Body [Statement]
           deriving Eq
 
@@ -115,7 +116,6 @@ instance Show Program where
 data ParseError = ParseError Int String
 --  deriving (Show, Eq)
 
-
 -- Pun intended
 haskii = ["",
          "\\\\\\ \\\\\\ ",
@@ -135,8 +135,6 @@ instance Alternative (Either ParseError) where
     empty        = Left $ ParseError 1 "Empty."
     Left _ <|> n = n
     m      <|> _ = m
-
-
 
 showError :: ParseError -> String
 showError (ParseError loc var) = show loc ++ var
@@ -273,28 +271,32 @@ unaryOperator = f <$>
           f "~" = UnOperator '~'
           f "!" = UnOperator '!'
 
+wrappedExpression = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
+                           parseExpression
+                           <* ws <* parseChar ')' <* ws)
+
 unaryOperation :: Parser Expression
 unaryOperation = Unary <$> unaryOperator <*> parseFactor
 
 addOperator :: Parser BinaryOperator
 addOperator = f <$>
   (ws *> parseString "+" <* ws)
-    where f "+" = AdditionOperator '+'
+    where f "+" = AdditionOperator
 
 subtractOperator :: Parser BinaryOperator
 subtractOperator = f <$>
   (ws *> parseString "-" <* ws)
-     where f "-" = SubtractOperator '-'
+     where f "-" = SubtractOperator
 
 multiplicationOperator :: Parser BinaryOperator
 multiplicationOperator = f <$>
   (ws *> parseString "*" <* ws)
-    where f "*" = MultiplicationOperator '*'
+    where f "*" = MultiplicationOperator
 
 divisionOperator :: Parser BinaryOperator
 divisionOperator = f <$>
   (ws *> parseString "/" <* ws)
-    where f "/" = DivisionOperator '/'
+    where f "/" = DivisionOperator
 
 binaryOperator :: Parser BinaryOperator
 binaryOperator = addOperator
@@ -315,8 +317,8 @@ parseExpression = do
           op <- binaryOperator
           t2 <- parseTerm
           case op of
-            AdditionOperator '+' -> loop (Binary Add t1 t2)
-            SubtractOperator '-' -> loop (Binary Sub t1 t2)
+            AdditionOperator -> loop (Binary Add t1 t2)
+            SubtractOperator -> loop (Binary Sub t1 t2)
         loop t = termSuffix t <|> return t
 
 parseTerm :: Parser Expression
@@ -327,18 +329,16 @@ parseTerm = do
             op <- binaryOperator
             f2 <- parseFactor
             case op of
-              MultiplicationOperator '*' -> loop (Binary Multiply f1 f2)
-              DivisionOperator '/' -> loop (Binary Divide f1 f2)
+              MultiplicationOperator -> loop (Binary Multiply f1 f2)
+              DivisionOperator -> loop (Binary Divide f1 f2)
               _ -> empty
-          loop t = factorSuffix t <|> return t
+          loop f = factorSuffix f <|> return f
 
 -- A factor is an expression a unary operator can be applied to.
 parseFactor :: Parser Expression
-parseFactor = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
-                           parseExpression
-                           <* ws <* parseChar ')' <* ws)
-      <|> unaryOperation
-      <|> constant
+parseFactor =  wrappedExpression
+           <|> unaryOperation
+           <|> constant
 
 returnStatement :: Parser Statement
 returnStatement = (Return <$ parseString "return") <* mandWs -- There must be a white space after return
@@ -355,7 +355,7 @@ returnType = f <$>
   where f "int"  = ReturnType "int"
         f "void" = ReturnType "void"
         f "char" = ReturnType "char"
-        f_       = undefined -- Proper error message
+        f_       = ReturnType "undefined"  -- TODO - Proper error message
 
 variableType :: Parser VariableType
 variableType = f <$>
@@ -363,7 +363,7 @@ variableType = f <$>
   where f "int"  = VariableType "int"
         f "void" = VariableType "void"
         f "char" = VariableType "char"
-        f_       = undefined -- Proper error message
+        f_       = VariableType "undefined" -- TODO - Proper error message
 
 -- NOTE: [a-zA-Z]\w* for now.
 -- TODO - First char must be an alpha but others can be digits
@@ -406,20 +406,34 @@ generateUnaryOperation (UnOperator op)
   | op=='~' = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
-generateTerm :: Expression -> String
-generateTerm = undefined
-
-generateFactor :: Expression -> String
-generateFactor = undefined
-
--- TODO - Handle new definitions!
 generateExpression :: Expression -> String
-generateExpression (Constant ex) = "movl     $"
-                                 ++ show ex
-                                 ++ ", %eax"
-                                 ++ "\n"
-generateExpression (Unary unop exp) =  generateExpression exp ++ generateUnaryOperation unop
--- generateExpression _ = empty
+-- TODO
+generateExpression (Binary Sub t1 t2)      =  "pop %rcx"
+                                           ++ "\n"
+                                           ++ "subl %ecx, %eax"
+                                           ++ "\n"
+generateExpression (Binary Multiply f1 f2) = "pop %rcx"
+                                           ++ "\n"
+                                           ++ "addl %ecx, %eax"
+                                           ++ "\n"
+generateExpression (Binary Divide f1 f2)   =  "pop %rcx"
+                                           ++ "\n"
+                                           ++ "subl %ecx, %eax"
+                                           ++ "\n"
+-- DONE
+generateExpression (Unary unop exp)        = generateExpression exp ++ generateUnaryOperation unop
+generateExpression (Binary Add t1 t2)      = generateExpression t1
+                                           ++ "push %rax" ++ "\n"
+                                           ++ generateExpression t2
+                                           ++ "pop %rcx"
+                                           ++ "\n"
+                                           ++ "addl %ecx, %eax"
+                                           ++ "\n"
+generateExpression (WrappedExpression ex)  = generateExpression ex
+generateExpression (Constant cons)         = "movl     $"
+                                           ++ show cons
+                                           ++ ", %eax"
+                                           ++ "\n"
 
 generateStatement :: [Statement] -> String
 generateStatement [Statement s ex]
@@ -500,7 +514,7 @@ main = do
        case runParser program source of
         Right (source, ast) ->
           putStrLn ("[INFO] Parsed as the following AST:\n" ++ show ast ++ "\n") >>
-          putStrLn ("[INFO] Instruction set: " ++ ins ++ "[INFO] Assembly:\n") >> -- NOTE: Only x86 for now
+          putStrLn ("[INFO] Instruction set: " ++ ins ++ "\n[INFO] Assembly:\n") >> -- NOTE: Only x86 for now
           putStrLn asm >>
           writeFile ass asm >>
           putStrLn ("\n[INFO] Assembly code was written to: " ++ ass)
