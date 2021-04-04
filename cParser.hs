@@ -408,12 +408,6 @@ generateUnaryOperation (UnOperator op)
 
 -- TODO
 generateExpression :: Expression -> String
-generateExpression (Binary Sub t1 t2)      =  "pop %rcx"
-                                           ++ "\n"
-                                           ++ "subl %ecx, %eax"
-                                           ++ "\n"
-
-
 generateExpression (Binary Divide f1 f2)   =  "pop %rcx"
                                            ++ "\n"
                                            ++ "subl %ecx, %eax"
@@ -435,6 +429,14 @@ generateExpression (Binary Add t1 t2)      = generateExpression t1
                                            ++ "pop %rcx"
                                            ++ "\n"
                                            ++ "addl %ecx, %eax"
+                                           ++ "\n"
+generateExpression (Binary Sub t1 t2)      =  generateExpression t2
+                                           ++ "push %rax"
+                                           ++ "\n"
+                                           ++ generateExpression t1
+                                           ++ "pop %rcx"
+                                           ++ "\n"
+                                           ++ "subl %ecx, %eax"
                                            ++ "\n"
 generateExpression (Unary unop exp)        = generateExpression exp ++ generateUnaryOperation unop
 generateExpression (Constant cons)         = "movl     $"
