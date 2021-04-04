@@ -406,30 +406,37 @@ generateUnaryOperation (UnOperator op)
   | op=='~' = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
-generateExpression :: Expression -> String
 -- TODO
+generateExpression :: Expression -> String
 generateExpression (Binary Sub t1 t2)      =  "pop %rcx"
                                            ++ "\n"
                                            ++ "subl %ecx, %eax"
                                            ++ "\n"
-generateExpression (Binary Multiply f1 f2) = "pop %rcx"
-                                           ++ "\n"
-                                           ++ "addl %ecx, %eax"
-                                           ++ "\n"
+
+
 generateExpression (Binary Divide f1 f2)   =  "pop %rcx"
                                            ++ "\n"
                                            ++ "subl %ecx, %eax"
                                            ++ "\n"
 -- DONE
-generateExpression (Unary unop exp)        = generateExpression exp ++ generateUnaryOperation unop
+generateExpression (WrappedExpression ex)  = generateExpression ex
+generateExpression (Binary Multiply f1 f2) = generateExpression f1
+                                           ++ "push %rax"
+                                           ++ "\n"
+                                           ++ generateExpression f2
+                                           ++ "pop %rcx"
+                                           ++ "\n"
+                                           ++ "imul %ecx, %eax"
+                                           ++ "\n"
 generateExpression (Binary Add t1 t2)      = generateExpression t1
-                                           ++ "push %rax" ++ "\n"
+                                           ++ "push %rax"
+                                           ++ "\n"
                                            ++ generateExpression t2
                                            ++ "pop %rcx"
                                            ++ "\n"
                                            ++ "addl %ecx, %eax"
                                            ++ "\n"
-generateExpression (WrappedExpression ex)  = generateExpression ex
+generateExpression (Unary unop exp)        = generateExpression exp ++ generateUnaryOperation unop
 generateExpression (Constant cons)         = "movl     $"
                                            ++ show cons
                                            ++ ", %eax"
