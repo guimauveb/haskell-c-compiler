@@ -406,13 +406,8 @@ generateUnaryOperation (UnOperator op)
   | op=='~' = "not      %eax"     ++ "\n"
   | otherwise = "Unknown unary operator."
 
--- TODO
-generateExpression :: Expression -> String
-generateExpression (Binary Divide f1 f2)   =  "pop %rcx"
-                                           ++ "\n"
-                                           ++ "subl %ecx, %eax"
-                                           ++ "\n"
 -- DONE
+generateExpression :: Expression -> String
 generateExpression (WrappedExpression ex)  = generateExpression ex
 generateExpression (Binary Multiply f1 f2) = generateExpression f1
                                            ++ "push %rax"
@@ -422,6 +417,22 @@ generateExpression (Binary Multiply f1 f2) = generateExpression f1
                                            ++ "\n"
                                            ++ "imul %ecx, %eax"
                                            ++ "\n"
+                                           ++ "movl %eax, %ecx"
+                                           ++ "\n"
+generateExpression (Binary Divide f1 f2)   =  generateExpression f1
+                                           ++ "push %rax"
+                                           ++ "\n"
+                                           ++ generateExpression f2
+                                           ++ "movl %eax, %edx" -- Move previously f2 value from eax to edx
+                                            ++ "\n"
+                                           ++ "movl %edx, %r8d" -- Then move edx content to r8d so edx is free. r8d is now the divisor.
+                                           ++ "\n"
+                                           ++ "pop %rax"        -- We need the dividend in eax and edx to be its sign.
+                                           ++ "\n"
+                                           ++ "cdq"             -- Convert to sign extended (fills edx with the sign bit of eax).
+                                           ++ "\n"
+                                           ++ "idiv %r8d"       -- The result will be placed into eax (and the remainder into edx).
+                                           ++ "\n"
 generateExpression (Binary Add t1 t2)      = generateExpression t1
                                            ++ "push %rax"
                                            ++ "\n"
@@ -429,6 +440,7 @@ generateExpression (Binary Add t1 t2)      = generateExpression t1
                                            ++ "pop %rcx"
                                            ++ "\n"
                                            ++ "addl %ecx, %eax"
+                                           ++ "movl %eax, %ecx"
                                            ++ "\n"
 generateExpression (Binary Sub t1 t2)      =  generateExpression t2
                                            ++ "push %rax"
@@ -437,6 +449,8 @@ generateExpression (Binary Sub t1 t2)      =  generateExpression t2
                                            ++ "pop %rcx"
                                            ++ "\n"
                                            ++ "subl %ecx, %eax"
+                                           ++ "\n"
+                                           ++ "movl %eax, %ecx"
                                            ++ "\n"
 generateExpression (Unary unop exp)        = generateExpression exp ++ generateUnaryOperation unop
 generateExpression (Constant cons)         = "movl     $"
