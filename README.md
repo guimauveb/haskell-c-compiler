@@ -10,7 +10,7 @@ My goal is to learn more about functionnal programming, Haskell being king in th
 - **Part 1: Done!**
 - **Part 2: Done!**
 - **Part 3: Done!**
-- **Part 4: Doing...**
+- **Part 4: Properly parses ||, &&, >, <, >=, <=, ==, != operators. Working on assembly generation now.**
 
 ### Usage
 
