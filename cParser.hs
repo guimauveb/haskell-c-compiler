@@ -48,7 +48,18 @@ instance Show Declaration where
   show (Declaration var identifier) = "Declaration " ++ show var ++ " " ++ show identifier
                          ++ "           "
 
-data BinOp = Add | Sub | Multiply | Divide
+data BinOp = Add
+           | Sub
+           | Multiply
+           | Divide
+           | Greater
+           | Lesser
+           | GreaterOrEqual
+           | LesserOrEqual
+           | Equal
+           | NotEqual
+           | LogicalAnd
+           | LogicalOr
     deriving (Show, Eq)
 
 data Expression = Binary BinOp Expression Expression
@@ -69,6 +80,14 @@ data BinaryOperator = MultiplicationOperator
                     | DivisionOperator
                     | AdditionOperator
                     | SubtractOperator
+                    | GreaterOperator
+                    | LesserOperator
+                    | GreaterOrEqualOperator
+                    | LesserOrEqualOperator
+                    | EqualOperator
+                    | NotEqualOperator
+                    | LogicalAndOperator
+                    | LogicalOrOperator
                     deriving (Show, Eq)
 
 newtype VariableType = VariableType String
@@ -271,12 +290,7 @@ unaryOperator = f <$>
           f "~" = UnOperator '~'
           f "!" = UnOperator '!'
 
-wrappedExpression = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
-                           parseExpression
-                           <* ws <* parseChar ')' <* ws)
 
-unaryOperation :: Parser Expression
-unaryOperation = Unary <$> unaryOperator <*> parseFactor
 
 addOperator :: Parser BinaryOperator
 addOperator = f <$>
@@ -298,19 +312,119 @@ divisionOperator = f <$>
   (ws *> parseString "/" <* ws)
     where f "/" = DivisionOperator
 
+greaterOperator :: Parser BinaryOperator
+greaterOperator = f <$>
+  (ws *> parseString ">" <* ws)
+    where f ">" = GreaterOperator
+
+lesserOperator :: Parser BinaryOperator
+lesserOperator = f <$>
+  (ws *> parseString "<" <* ws)
+    where f "<" = LesserOperator
+
+greaterOrEqualOperator :: Parser BinaryOperator
+greaterOrEqualOperator = f <$>
+  (ws *> parseString ">=" <* ws)
+    where f ">=" = GreaterOrEqualOperator
+
+lesserOrEqualOperator :: Parser BinaryOperator
+lesserOrEqualOperator = f <$>
+  (ws *> parseString "<=" <* ws)
+    where f "<=" = LesserOrEqualOperator
+
+equalOperator :: Parser BinaryOperator
+equalOperator = f <$>
+  (ws *> parseString "==" <* ws)
+    where f "==" = EqualOperator
+
+notEqualOperator :: Parser BinaryOperator
+notEqualOperator = f <$>
+  (ws *> parseString "!=" <* ws)
+    where f "!=" = NotEqualOperator
+
+logicalAndOperator :: Parser BinaryOperator
+logicalAndOperator = f <$>
+  (ws *> parseString "&&" <* ws)
+    where f "&&" = LogicalAndOperator
+
+logicalOrOperator :: Parser BinaryOperator
+logicalOrOperator = f <$>
+  (ws *> parseString "||" <* ws)
+    where f "||" = LogicalOrOperator
+
+-- TODO - Split logical operators from the rest
 binaryOperator :: Parser BinaryOperator
 binaryOperator = addOperator
               <|> subtractOperator
               <|> multiplicationOperator
               <|> divisionOperator
+              <|> greaterOperator
+              <|> lesserOperator
+              <|> greaterOrEqualOperator
+              <|> lesserOrEqualOperator
+              <|> equalOperator
+              <|> notEqualOperator
+              <|> logicalAndOperator
+              <|> logicalOrOperator
 
+wrappedExpression = WrappedExpression <$> (ws *> parseChar '(' *> ws *>
+                           parseExp
+                           <* ws <* parseChar ')' <* ws)
 
-constant :: Parser Expression
-constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
-  where f ds = Constant $ read ds
+parseExp :: Parser Expression
+parseExp = do
+  l1 <- parseLogicalAndExp
+  loop l1
+    where logicalSuffix l1 = do
+            op <- binaryOperator
+            l2 <- parseLogicalAndExp
+            case op of
+              LogicalOrOperator -> loop (Binary LogicalOr l1 l2)
+              _ -> empty
+          loop l = logicalSuffix l <|> return l
 
-parseExpression :: Parser Expression
-parseExpression = do
+parseLogicalAndExp :: Parser Expression
+parseLogicalAndExp = do
+  e1 <- parseEqualityExp
+  loop e1
+    where equalitySuffix e1 = do
+            op <- binaryOperator -- && operator
+            e2 <- parseEqualityExp
+            case op of
+              LogicalAndOperator -> loop (Binary LogicalAnd e1 e2)
+              _ -> empty
+          loop e = equalitySuffix e <|> return e
+
+parseEqualityExp :: Parser Expression
+parseEqualityExp = do
+  r1 <- parseRelationalExp
+  loop r1
+    where relationalSuffix r1 = do
+            op <- binaryOperator -- && operator
+            r2 <- parseRelationalExp
+            case op of
+              EqualOperator -> loop (Binary Equal r1 r2)
+              NotEqualOperator -> loop (Binary NotEqual r1 r2)
+              _ -> empty
+          loop r = relationalSuffix r <|> return r
+
+parseRelationalExp :: Parser Expression
+parseRelationalExp = do
+  a1 <- parseAdditiveExp
+  loop a1
+    where additionalSuffix a1 = do
+            op <- binaryOperator -- && operator
+            a2 <- parseAdditiveExp
+            case op of
+              GreaterOperator -> loop (Binary Greater a1 a2)
+              LesserOperator -> loop (Binary Lesser a1 a2)
+              GreaterOrEqualOperator -> loop (Binary GreaterOrEqual a1 a2)
+              LesserOrEqualOperator -> loop (Binary LesserOrEqual a1 a2)
+              _ -> empty
+          loop a = additionalSuffix a <|> return a
+
+parseAdditiveExp :: Parser Expression
+parseAdditiveExp = do
   t1 <- parseTerm
   loop t1
   where termSuffix t1 = do
@@ -319,6 +433,7 @@ parseExpression = do
           case op of
             AdditionOperator -> loop (Binary Add t1 t2)
             SubtractOperator -> loop (Binary Sub t1 t2)
+            _ -> empty
         loop t = termSuffix t <|> return t
 
 parseTerm :: Parser Expression
@@ -334,18 +449,24 @@ parseTerm = do
               _ -> empty
           loop f = factorSuffix f <|> return f
 
--- A factor is an expression a unary operator can be applied to.
 parseFactor :: Parser Expression
 parseFactor =  wrappedExpression
            <|> unaryOperation
            <|> constant
+
+unaryOperation :: Parser Expression
+unaryOperation = Unary <$> unaryOperator <*> parseFactor
+
+constant :: Parser Expression
+constant = f <$> (isIntMax . notNull) (ws *> spanP isDigit <* ws)
+  where f ds = Constant $ read ds
 
 returnStatement :: Parser Statement
 returnStatement = (Return <$ parseString "return") <* mandWs -- There must be a white space after return
 
 -- NOTE: Can be a lot of things (but always ends with a semicolon)
 statement :: Parser Statement
-statement = Statement <$> returnStatement  <*> parseExpression <* semicolon
+statement = Statement <$> returnStatement  <*> parseExp <* semicolon
 
 -- TODO - NOTE: Use a data structure to represent data types (int, char etc) instead of having the same code
 -- for both returnType and variableType
