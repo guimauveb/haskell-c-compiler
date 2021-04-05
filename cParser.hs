@@ -424,7 +424,7 @@ generateExpression (Binary Divide f1 f2)   =  generateExpression f1
                                            ++ "\n"
                                            ++ generateExpression f2
                                            ++ "movl %eax, %edx" -- Move f2 value from eax to edx.
-                                            ++ "\n"
+                                           ++ "\n"
                                            ++ "movl %edx, %r8d" -- Then move edx content to r8d so edx is free. r8d is now the divisor.
                                            ++ "\n"
                                            ++ "pop %rax"        -- We need the dividend in eax and edx to be its sign.
