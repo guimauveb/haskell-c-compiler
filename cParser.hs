@@ -423,7 +423,7 @@ generateExpression (Binary Divide f1 f2)   =  generateExpression f1
                                            ++ "push %rax"
                                            ++ "\n"
                                            ++ generateExpression f2
-                                           ++ "movl %eax, %edx" -- Move previously f2 value from eax to edx
+                                           ++ "movl %eax, %edx" -- Move f2 value from eax to edx.
                                             ++ "\n"
                                            ++ "movl %edx, %r8d" -- Then move edx content to r8d so edx is free. r8d is now the divisor.
                                            ++ "\n"
